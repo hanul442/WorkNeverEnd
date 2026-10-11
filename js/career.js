@@ -9,7 +9,7 @@
     if (s.rank === undefined) s.rank = 0;
     if (s.points === undefined) s.points = 0;
     if (s.leave === undefined) s.leave = 2;
-    if (!s.week) s.week = { workdays: 0, done: 0, missed: 0 };
+    if (!s.week) s.week = { workdays: 0, done: 0, missed: 0, good: 0, bad: 0 };
     if (!s.reviews) s.reviews = [];
     if (!s.level) s.level = 'easy';
     window.PEOPLE.me.rank = W.rankName();
@@ -41,15 +41,29 @@
     const rate = handled ? wk.done / handled : 0;
     const rep = Math.round(s.stats.rep);
     let g = null;
+    // 다면평가: 이번 주에 쌓은 덕과 업보
+    const good = wk.good || 0;
+    const bad = wk.bad || 0;
+    let peer = 0;
+    if (good - bad >= 4) peer = 1;
+    else if (bad - good >= 4) peer = -1;
+    let bonus = 0;
+    const bonusNotes = [];
+    if (s.flags.parkProject && !s.flags.parkProjectPaid) {
+      s.flags.parkProjectPaid = true;
+      bonus++;
+      bonusNotes.push('팀장님이 맡긴 신규 프로젝트를 고과에 반영했다. +1');
+    }
     if (wk.workdays > 0) {
       g = window.GRADES.find((x) => rate >= x.rate && rep >= x.rep);
-      s.points = Math.max(0, s.points + g.points);
+      s.points = Math.max(0, s.points + g.points + peer + bonus);
     }
+    if (s.flags.runClub) { W.applyEffects({ mental: 5 }); bonusNotes.push('러닝 동호회로 주말에 개운했다. 멘탈 +5'); }
     const pay = window.RANKS[s.rank].pay;
     W.applyEffects({ stamina: 15, mental: 15, money: pay });
     s.leave++;
     s.reviews.unshift({ week, grade: g ? g.grade : '-', rate: Math.round(rate * 100), done: wk.done, missed: wk.missed, rank: W.rankName() });
-    s.week = { workdays: 0, done: 0, missed: 0 };
+    s.week = { workdays: 0, done: 0, missed: 0, good: 0, bad: 0 };
     W.learnTerms('{{인사평가}} {{고과}}');
 
     const next = W.nextRank();
@@ -62,8 +76,9 @@
           <tr><td>놓치거나 반려된 업무</td><td>${wk.missed}건</td></tr>
           <tr><td>처리율</td><td>${Math.round(rate * 100)}%</td></tr>
           <tr><td>평판</td><td>${rep}</td></tr>
-          <tr><td>승진 포인트</td><td>${g.points >= 0 ? '+' : ''}${g.points} → ${s.points}${next ? ' / ' + next.need : ''}</td></tr>
-        </table>`
+          <tr><td>다면평가 (덕 ${good} · 업보 ${bad})</td><td>${peer > 0 ? '+1 동료들이 좋게 봤다' : peer < 0 ? '−1 뒷말이 많았다' : '0'}</td></tr>
+          <tr><td>승진 포인트</td><td>${g.points + peer + bonus >= 0 ? '+' : ''}${g.points + peer + bonus} → ${s.points}${next ? ' / ' + next.need : ''}</td></tr>
+        </table>${bonusNotes.map((n) => `<p class="up">${esc(n)}</p>`).join('')}`
       : '<p>이번 주는 내내 휴가였다. 평가는 다음 주에.</p>';
     W.openModal(`<p class="eyebrow">${week}주차 마감 · 주말</p><h3>주간 ${W.rich('{{인사평가}}')}</h3>
       ${gradeHtml}
@@ -86,15 +101,21 @@
     const pool = known.length >= 3 ? known : all;
     const questions = W.shuffle(pool).slice(0, 3);
     let right = 0;
+    // 면접관과의 관계가 심사 분위기를 바꾼다
+    const bossRel = (W.rel('choi') + W.rel('kang') + W.rel('park')) / 3;
+    const ally = s.flags.choiPick || bossRel >= 20;
+    const foe = !ally && bossRel <= -20;
+    const mood = ally ? '최영수 부장님이 "이 친구 괜찮아요"라며 분위기를 풀어 준다. (보기 하나가 줄어요)'
+      : foe ? '면접관들 표정이 굳어 있다. 평소 관계가 안 좋았다. (보기가 하나 늘어요)' : '';
 
     const ask = (i) => {
       if (i >= questions.length) return result();
       const term = questions[i];
-      const wrong = W.shuffle(all.filter((t) => t !== term)).slice(0, 2);
+      const wrong = W.shuffle(all.filter((t) => t !== term)).slice(0, ally ? 1 : foe ? 3 : 2);
       const opts = W.shuffle([term, ...wrong]);
       W.openModal(`<p class="eyebrow">${next.name} 승진 심사 · 질문 ${i + 1}/3</p>
         <h3>"${esc(term)}"이 무슨 뜻인지 설명해 보세요.</h3>
-        <p class="hint">면접관: 최영수 부장, 강태호 이사</p>`,
+        <p class="hint">면접관: 최영수 부장, 강태호 이사</p>${mood ? `<p class="${ally ? 'up' : 'down'}">${esc(mood)}</p>` : ''}`,
       opts.map((t) => ({ label: window.TERMS[t].meaning, onClick: () => {
         if (t === term) right++;
         ask(i + 1);
@@ -155,6 +176,8 @@
           <option value="">지정 안 함</option>
         </select>
         <p class="hint">결재선: 박지훈 팀장. 지금 가진 돈 ${W.fmtMoney(s.stats.money)}. 경비는 출발할 때와 매일 빠져나가요.</p>
+        ${W.pendingKarma().length || s.tasks.length ? `<div class="karma-box"><span class="label">휴가 전에 확인</span>
+          <p>휴가 중 연락으로 돌아올 수 있는 일: 쌓인 업보 ${W.pendingKarma().length}건${s.tasks.length ? `, 오늘 퇴근 전까지 못 끝내면 업무함 ${s.tasks.length}건도` : ''}.</p></div>` : ''}
       </div>`,
     [
       { label: '휴가신청서 상신하기', onClick: () => {
@@ -234,6 +257,8 @@
           <p class="hint">${W.rich('{{인사평가}}')} 등급마다 포인트가 쌓여요. S +3, A +2, B +1, C 0, D −1. 포인트가 차면 승진 심사(실무 용어 면접)를 봅니다.</p>
         </section>
         <section class="card"><div class="card-head"><h2>근태 · 휴가</h2></div>${vacInfo}</section>
+        ${W.ledgerCard()}
+        ${W.relationCard()}
         <section class="card"><div class="card-head"><h2>직급 체계</h2></div>
           <ol class="ladder">${window.RANKS.map((r, i) => `<li class="${i === s.rank ? 'now' : i < s.rank ? 'past' : ''} ${r.open ? '' : 'locked'}">
             <span>${esc(r.name)}</span><span class="muted">${W.fmtMoney(r.pay)}</span>${i === s.rank ? '<span class="chip good">현재</span>' : ''}${r.open ? '' : '<span class="chip">준비 중</span>'}</li>`).reverse().join('')}</ol>

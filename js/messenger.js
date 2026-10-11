@@ -44,6 +44,7 @@
     M.post(roomId, 'me', opt.label);
     W.learnTerms(chat.text);
     W.applyEffects(opt.effects);
+    W.afterAnswer(chat, opt);
     if (opt.accept && chat.weird) W.addTask({ ...chat.weird.task, weird: true }, false);
     setTimeout(() => {
       if (opt.reply) M.post(roomId, chat.from, opt.reply);
@@ -108,8 +109,15 @@
 
   function listView() {
     const rooms = Object.values(W.s.rooms).sort((a, b) => b.last - a.last);
-    if (!rooms.length) return '<div class="msg-head"><h2>메신저</h2></div><p class="empty pad">아직 조용하다. 불길하다.</p>';
-    return `<div class="msg-head"><h2>메신저</h2></div><ul class="room-list">${rooms.map((r) => {
+    const head = `<div class="msg-head"><h2>메신저</h2><button type="button" class="link-btn" data-dir>${W.s.showDir ? '대화 목록' : '동료 목록 · 말 걸기'}</button></div>`;
+    if (W.s.showDir) {
+      return head + `<ul class="room-list">${W.COLLEAGUES.map((id) => `<li><button type="button" class="room-item" data-room="${id}">
+        ${W.avatar(id)}<span class="room-main"><span class="room-name">${esc(W.fullName(id))} <small>${esc(W.person(id).dept)}</small></span>
+        <span class="room-preview">${W.storyBeat(id) ? '할 이야기가 있는 것 같다' : '호감도 ' + W.rel(id)}</span></span>
+        <span class="room-side">${W.tierChip(id)}${W.storyBeat(id) ? '<span class="dot" title="이야기"></span>' : ''}</span></button></li>`).join('')}</ul>`;
+    }
+    if (!rooms.length) return head + '<p class="empty pad">아직 조용하다. 불길하다.</p>';
+    return `${head}<ul class="room-list">${rooms.map((r) => {
       const last = r.messages[r.messages.length - 1];
       const isTeam = !!window.ROOMS_EXTRA[r.id];
       const preview = last ? (last.kind === 'request' ? '[업무 요청] ' : '') + W.plain(last.text || '') : '';
@@ -151,11 +159,12 @@
       ? `<div class="quick">${pending.options.map((o, i) => `<button type="button" class="quick-btn" data-answer="${room.id}" data-i="${i}">${W.rich(o.label)}</button>`).join('')}</div>
         ${window.AI.enabled() && pending.scene ? `<div class="free"><textarea class="input" rows="2" id="free-${room.id}" placeholder="직접 답장 쓰기"></textarea>
           <button type="button" class="btn" data-free="${room.id}">보내고 AI 채점받기</button></div>` : ''}`
-      : room.scoring ? '<p class="hint quick">AI가 채점 중...</p>' : '<p class="hint quick">답장할 메시지가 없어요.</p>';
+      : room.scoring ? '<p class="hint quick">AI가 채점 중...</p>' : (W.talkOptions(room.id) || '<p class="hint quick">답장할 메시지가 없어요.</p>');
     return `<div class="msg-head room-head">
         <button type="button" class="icon-btn" data-room-back aria-label="대화방 목록으로">‹</button>
         ${isTeam ? '<span class="avatar sm c1 team" aria-hidden="true">팀</span>' : W.avatar(room.id, 'sm')}
         <div><strong>${esc(room.name)}</strong>${isTeam ? '' : `<small>${esc(p.dept)}</small>`}</div>
+        ${isTeam || !window.PEOPLE[room.id] ? '' : `<span class="room-tier">${W.tierChip(room.id)}</span>`}
       </div>
       <div class="msg-scroll">${bubbles}</div>${quick}`;
   }
@@ -170,6 +179,9 @@
       if (a) return M.answer(a.dataset.answer, Number(a.dataset.i));
       const f = e.target.closest('[data-free]');
       if (f) return M.answerFree(f.dataset.free, W.$('#free-' + f.dataset.free).value);
+      if (e.target.closest('[data-dir]')) { W.s.showDir = !W.s.showDir; return W.renderMessenger(); }
+      const tk = e.target.closest('[data-talk]');
+      if (tk) return W.talk(tk.dataset.who, tk.dataset.talk);
       const o = e.target.closest('[data-open-task]');
       if (o) return W.openTask(o.dataset.openTask);
     });
@@ -177,6 +189,7 @@
 
   M.open = (roomId) => {
     W.s.openRoom = roomId;
+    W.s.showDir = false;
     M.room(roomId).unread = 0;
     W.renderMessenger();
   };

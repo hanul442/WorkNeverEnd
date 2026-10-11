@@ -64,6 +64,7 @@
     { text: '금요일은 빼고', ok: (e) => e.day !== 4 },
     { text: '퇴근 1시간 전(17시)까지 끝나게', ok: (e) => e.start + e.dur <= 17 }
   ];
+  W.EXTRA_RULES = EXTRA_RULES;
 
   // 옮긴 자리가 맞는지 확인하고 틀렸으면 이유를 돌려준다
   W.checkSlot = (task, slot) => {

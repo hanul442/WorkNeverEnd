@@ -21,7 +21,7 @@
 
       el.innerHTML = `
         <div class="legend">
-          <span><i class="sw target"></i>옮길 회의</span><span><i class="sw related"></i>참석자 일정</span><span><i class="sw other"></i>다른 사람 일정</span>
+          <span><i class="sw target"></i>옮길 회의</span><span><i class="sw related"></i>참석자 일정</span><span><i class="sw other"></i>다른 사람 일정</span><span><i class="sw past"></i>지난 시간</span>
         </div>
         ${grid}
         <p class="hint">빈 칸을 누르거나 파란 회의를 끌어다 놓으면 새 시간이 표시돼요. 지금: ${window.WEEKDAYS[ev.day]} ${ev.start}시 (${d.dur}시간)</p>
@@ -70,12 +70,19 @@
       const cells = [];
       if (interactive) {
         for (let h = 9; h < 18; h++) {
-          cells.push(`<button type="button" class="cal-cell ${h === 12 ? 'lunch' : ''}" style="top:calc(${h - 9} * var(--hour))"
+          // 이미 지난 시간은 고를 수 없게 막아 둔다
+          const past = day < todayIdx || (day === todayIdx && h * 60 <= W.s.minute);
+          cells.push(past
+            ? `<div class="cal-cell past" style="top:calc(${h - 9} * var(--hour))" title="이미 지난 시간"></div>`
+            : `<button type="button" class="cal-cell ${h === 12 ? 'lunch' : ''}" style="top:calc(${h - 9} * var(--hour))"
             data-slot-day="${day}" data-slot-start="${h}" aria-label="${wd}요일 ${h}시로 옮기기"></button>`);
         }
       } else {
         cells.push('<div class="cal-lunch" style="top:calc(3 * var(--hour))"></div>');
       }
+      // 지난 시간은 흐리게
+      const pastH = day < todayIdx ? 9 : day === todayIdx ? W.clamp(W.s.minute / 60 - 9, 0, 9) : 0;
+      if (pastH > 0 && !interactive) cells.push(`<div class="cal-past" style="height:calc(${pastH} * var(--hour))"></div>`);
       const dayEvents = W.s.calendar.filter((e) => e.day === day);
       const lanes = layoutLanes(dayEvents);
       const blocks = dayEvents.map((e) => {

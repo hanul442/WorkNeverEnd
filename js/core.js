@@ -21,10 +21,11 @@ window.WNE = (() => {
 
   // 난이도. gap: 업무 요청 간격(최소, 랜덤 폭), pass/ok: 통과·수정 후 통과 기준,
   // help: 공식과 규정 미리 보여 주기, hardFrom: 예산·보고서 업무가 나오기 시작하는 날
+  // urgent: 긴급 업무 확률, twist: 업무를 연 뒤 요청이 바뀔 확률
   const LEVELS = {
-    easy: { label: '쉬움', initial: 1, gap: [70, 40], weird: [0, 1], chats: 4, deadline: 1.5, pass: 0.75, ok: 0.4, help: true, hardFrom: 2 },
-    normal: { label: '보통', initial: 2, gap: [45, 25], weird: [1, 1], chats: 5, deadline: 1.2, pass: 0.85, ok: 0.5, help: false, hardFrom: 1 },
-    hard: { label: '어려움', initial: 3, gap: [30, 20], weird: [1, 2], chats: 5, deadline: 1, pass: 0.9, ok: 0.6, help: false, hardFrom: 1 }
+    easy: { label: '쉬움', urgent: 0.08, twist: 0.25, initial: 1, gap: [70, 40], weird: [0, 1], chats: 4, deadline: 1.5, pass: 0.75, ok: 0.4, help: true, hardFrom: 2 },
+    normal: { label: '보통', urgent: 0.15, twist: 0.35, initial: 2, gap: [45, 25], weird: [1, 1], chats: 5, deadline: 1.2, pass: 0.85, ok: 0.5, help: false, hardFrom: 1 },
+    hard: { label: '어려움', urgent: 0.22, twist: 0.45, initial: 3, gap: [30, 20], weird: [1, 2], chats: 5, deadline: 1, pass: 0.9, ok: 0.6, help: false, hardFrom: 1 }
   };
 
   const W = { C, STAT_INFO, LEVELS, s: null, apps: {}, gen: {} };
@@ -132,7 +133,7 @@ window.WNE = (() => {
   W.save = () => {
     try {
       const s = W.s;
-      const keep = ['name', 'job', 'level', 'day', 'stats', 'glossary', 'hangover', 'rank', 'points', 'leave', 'week', 'reviews', 'vacation', 'back'];
+      const keep = ['name', 'job', 'level', 'day', 'stats', 'glossary', 'hangover', 'rank', 'points', 'leave', 'week', 'reviews', 'vacation', 'back', 'karma', 'rel', 'flags', 'story', 'storyDay', 'returns', 'talked'];
       localStorage.setItem(C.SAVE_KEY, JSON.stringify(Object.fromEntries(keep.map((k) => [k, s[k]]))));
     } catch (e) { /* 저장이 막힌 브라우저에서는 넘어간다 */ }
   };

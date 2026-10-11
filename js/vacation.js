@@ -44,10 +44,15 @@
         let ok = 0;
         d.items.forEach((it, i) => {
           if (ui('to' + i) === it.right) ok++;
-          else errors.push(`"${W.plain(it.text)}"은 ${W.person(it.right).dept} ${W.fullName(it.right)}`);
+          else {
+            errors.push(`"${W.plain(it.text)}"은 ${W.person(it.right).dept} ${W.fullName(it.right)}`);
+            // 엉뚱한 사람이 받았으면 그 사람이, 아무도 안 받았으면 원래 담당자가 휴가 중에 연락한다
+            W.karma('handover', ui('to' + i) || it.right, it.text);
+          }
         });
         if (String(ui('rule')) === '0') ok++;
         else errors.push('연락 기준은 "급한 건만, 나머지는 복귀 후"가 무난해요');
+        if (ok / (d.items.length + 1) >= 0.8 && d.deputy) W.karma('covered', d.deputy);
         finish(ok / (d.items.length + 1), errors.length
           ? '인수인계 빈틈: ' + errors.join(' / ') + '. 빈틈이 있으면 휴가 중에 연락이 더 와요.'
           : '깔끔한 인수인계서. 이제 마음 놓고 쉬어도 된다.');
@@ -77,7 +82,12 @@
     s.vacSlot = 0;
     s.minute = 10 * 60;
     s.dayStartStats = { ...s.stats };
-    s.vacDay = { contacts: 0, replied: 0 };
+    s.vacDay = { contacts: 0, replied: 0, reasons: [] };
+    // 휴가 첫날, 준비를 안 한 대가가 업보로 쌓인다
+    if (s.day === v.start) {
+      if (!v.doc) W.karma('nohandover', 'park');
+      if (!v.auto) W.karma('noauto', 'partner');
+    }
     const nth = s.day - v.start + 1;
     const spend = d.perDay + (nth === 1 ? d.cost : 0);
     W.applyEffects({ money: -spend });
@@ -121,22 +131,43 @@
     })));
   }
 
-  // 연락 올 확률: 기본 65%에서 자동응답, 인수인계, 직무대행에 따라 줄고 휴가지에 따라 달라진다
+  // 연락 올 확률: 기본 65%에서 자동응답, 인수인계, 직무대행에 따라 줄고, 쌓인 업보가 많을수록 늘어난다
   function contactChance() {
     const v = W.s.vacation;
     let p = 0.65;
     if (v.auto) p -= 0.12;
     p -= 0.25 * v.handoverQ;
     if (v.deputy) p -= 0.05;
-    return Math.max(0.2, p * window.DESTINATIONS[v.dest].contact);
+    p = p * window.DESTINATIONS[v.dest].contact + 0.08 * Math.min(5, W.pendingKarma().length);
+    return W.clamp(p, 0.2, 0.92);
   }
+
+  // 이번 연락을 고른다. 쌓인 업보가 있으면 대개 그게 먼저 돌아온다.
+  function pickContact() {
+    const s = W.s;
+    const v = s.vacation;
+    const karma = W.pendingKarma();
+    if (karma.length && Math.random() < 0.8) {
+      const k = W.pick(karma);
+      s.karma = s.karma.filter((x) => x !== k);
+      const { text, why } = W.karmaText(k);
+      return { from: k.from, kind: 'work', text, why, karma: true };
+    }
+    const pool = window.VACATION_CONTACTS.filter((c) => !c.home || v.dest === 'home');
+    const c = W.pick(pool);
+    return { ...c, why: c.kind === 'work' ? '딱히 내 잘못은 없다. 회사는 원래 이렇다.' : '가족과 친구는 내가 휴가인 걸 안다.' };
+  }
+
+  const SLOT_TIME = { morning: '10:2', afternoon: '15:4', evening: '21:1' };
 
   function maybeContact() {
     const s = W.s;
     const v = s.vacation;
     if (Math.random() >= contactChance()) return nextSlot();
-    const pool = window.VACATION_CONTACTS.filter((c) => !c.home || v.dest === 'home');
-    const c = W.pick(pool);
+    // 덕을 쌓아 뒀다면 누군가 대신 막아 준다
+    const shield = W.pendingGood().find((k) => window.PEOPLE[k.from] && !window.PEOPLE[k.from].external);
+    if (shield && Math.random() < 0.4) return shieldEvent(shield);
+    const c = pickContact();
     const night = v.dest === 'abroad' && c.kind === 'work' && Math.random() < 0.5;
     const text = c.text;
     W.msg.post(c.from, c.from, text);
@@ -144,14 +175,23 @@
     v.contacts++;
     s.vacDay.contacts++;
     const who = W.fullName(c.from).trim();
-    const head = `<p class="eyebrow">${night ? '현지 시각 새벽 3시 · ' : ''}메신저 알림</p>
-      <h3>${c.kind === 'work' ? '휴가 중에 회사에서 연락이 왔다' : '개인 연락이 왔다'}</h3>
-      <div class="vac-msg">${W.avatar(c.from, 'sm')}<div><strong>${esc(who)}</strong> <small class="muted">${esc(W.person(c.from).dept)}</small><p>${W.rich(text)}</p></div></div>`;
+    const time = night ? '03:0' + W.rand(10) : SLOT_TIME[SLOTS[s.vacSlot][0]] + W.rand(10);
+    const left = W.pendingKarma().length;
+    const head = `<h3 class="sr-only">${c.kind === 'work' ? '휴가 중에 회사에서 연락이 왔다' : '개인 연락이 왔다'}</h3>
+      <div class="phone ${night ? 'night' : ''}">
+        <div class="phone-top"><span>${time}</span><span>${esc(v.place)}${night ? ' · 현지 새벽' : ''}</span></div>
+        <p class="phone-title">${c.kind === 'work' ? '휴가 중인데 회사에서 연락이 왔다' : '개인 연락이 왔다'}</p>
+        <div class="phone-notif">${W.avatar(c.from, 'sm')}<div><div class="phone-who"><strong>${esc(who)}</strong><small>${esc(W.person(c.from).dept)} · 지금</small></div><p>${W.rich(text)}</p></div></div>
+      </div>
+      <div class="karma-box ${c.karma ? 'hit' : ''}"><span class="label">${c.karma ? '업보 · 이 연락이 온 이유' : '이 연락이 온 이유'}</span><p>${esc(c.why)}</p>
+        ${left ? `<small class="muted">아직 터지지 않은 업보 ${left}건</small>` : ''}</div>`;
+    const why = c.why;
     const done = (reply, effects, result) => {
       W.closeModal();
       if (reply) W.msg.post(c.from, 'me', reply);
       W.applyEffects(effects);
-      v.log.push({ day: s.day - v.start + 1, slot: '연락', text: `${who}: ${W.plain(text)} → ${result}`, effects, contact: true });
+      v.log.push({ day: s.day - v.start + 1, slot: '연락', text: `${who}: ${W.plain(text)} → ${result}`, why, effects, contact: true });
+      s.vacDay.reasons.push(why);
       W.renderMain();
       if (W.s.over) return;
       nextSlot();
@@ -180,10 +220,36 @@
           good ? `${dep}님이 인수인계서 보고 처리했다고 한다.` : `${dep}님: "인수인계서에 그 내용은 없던데요...?"`) });
       }
       options.push(night
-        ? { label: '비행기 모드 켜고 다시 자기', onClick: () => done(null, { mental: 2, rep: -3 }, '아침에 보니 부재중 전화 3통.') }
-        : { label: '읽고 답 안 하기', onClick: () => done(null, { mental: 2, rep: -4 }, '1이 사라졌다. 저쪽도 내가 봤다는 걸 안다.') });
+        ? { label: '비행기 모드 켜고 다시 자기', onClick: () => { W.karma('ghosted', c.from); done(null, { mental: 2, rep: -3 }, '아침에 보니 부재중 전화 3통.'); } }
+        : { label: '읽고 답 안 하기', onClick: () => { W.karma('ghosted', c.from); done(null, { mental: 2, rep: -4 }, '1이 사라졌다. 저쪽도 내가 봤다는 걸 안다.'); } });
     }
     W.openModal(head, options);
+  }
+
+  function shieldEvent(k) {
+    const s = W.s;
+    const v = s.vacation;
+    W.consumeKarma(k);
+    const who = W.fullName(k.from).trim();
+    const text = `{me} 쉬세요~ 회사에서 찾는 거 있었는데 제가 대신 처리했어요. 지난번에 고마웠던 거 갚는 거예요 ㅎㅎ`;
+    W.msg.post(k.from, k.from, text);
+    const why = W.karmaText(k).why;
+    W.logReturn(k, `휴가 중에 ${who}님이 연락을 대신 막아 줬다.`);
+    W.openModal(`<h3 class="sr-only">동료가 대신 막아 줬다</h3>
+      <div class="phone"><div class="phone-top"><span>${SLOT_TIME[SLOTS[s.vacSlot][0]]}${W.rand(10)}</span><span>${esc(v.place)}</span></div>
+        <p class="phone-title">동료가 대신 막아 줬다</p>
+        <div class="phone-notif">${W.avatar(k.from, 'sm')}<div><div class="phone-who"><strong>${esc(who)}</strong><small>지금</small></div><p>${W.rich(text)}</p></div></div></div>
+      <div class="karma-box good"><span class="label">덕 · 이 일이 생긴 이유</span><p>${esc(why)}</p></div>`,
+    [{ label: '고마워요 ㅠㅠ (멘탈 +5)', onClick: () => {
+      W.closeModal();
+      W.msg.post(k.from, 'me', '헉 감사해요ㅠㅠ 복귀하면 커피 살게요!');
+      W.applyEffects({ mental: 5 });
+      W.addRel(k.from, 3);
+      v.log.push({ day: s.day - v.start + 1, slot: '연락', text: `${who}님이 회사 연락을 대신 막아 줬다.`, why, good: true });
+      s.vacDay.reasons.push('덕: ' + why);
+      W.renderMain();
+      nextSlot();
+    } }]);
   }
 
   function nextSlot() {
@@ -211,7 +277,8 @@
     }
     W.openModal(`<p class="eyebrow">휴가 ${nth}/${v.days}일차 결산 · ${esc(v.place)}</p><h3>${last ? '휴가 끝' : '오늘의 휴가'}</h3>
       <p>${last ? '내일은 출근이다. 업무함이 어떻게 되어 있을지 상상하기 싫다.' : '하루가 너무 짧다.'}</p>
-      <table class="summary"><tr><td>회사에서 온 연락</td><td>${s.vacDay.contacts}건 (답장 ${s.vacDay.replied}건)</td></tr>${rows}</table>`,
+      <table class="summary"><tr><td>받은 연락</td><td>${s.vacDay.contacts}건 (답장 ${s.vacDay.replied}건)</td></tr>${rows}</table>
+      ${s.vacDay.reasons.length ? `<div class="karma-box"><span class="label">오늘 연락이 온 이유</span><ul>${s.vacDay.reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul></div>` : ''}`,
     [{ label: last ? '출근하러 가기' : '다음 날로', onClick: () => { W.closeModal(); W.nextDay(); } }]);
     W.save();
   }
@@ -232,9 +299,21 @@
       </section>
       <section class="card"><div class="card-head"><h2>휴가 일지</h2><span class="muted">회사 연락 ${v.contacts}건</span></div>
         <ul class="vac-log">${v.log.slice().reverse().map((l) => `<li class="${l.contact ? 'contact' : ''}">
-          <span class="time">${l.day}일차 ${esc(l.slot)}</span><span>${W.rich(l.text)}${l.effects ? ` <small class="muted">${esc(W.effectText(l.effects))}</small>` : ''}</span></li>`).join('')}</ul>
-      </section>`;
+          <span class="time">${l.day}일차 ${esc(l.slot)}</span><span>${W.rich(l.text)}${l.effects ? ` <small class="muted">${esc(W.effectText(l.effects))}</small>` : ''}${l.why ? `<small class="why ${l.good ? 'good' : ''}">${l.good ? '덕' : '이유'}: ${esc(l.why)}</small>` : ''}</span></li>`).join('')}</ul>
+      </section>
+      ${karmaCard()}`;
   };
+
+  // 아직 터지지 않은 업보 목록
+  function karmaCard() {
+    const list = W.pendingKarma();
+    return `<section class="card"><div class="card-head"><h2>아직 터지지 않은 업보</h2><span class="muted">${list.length}건</span></div>
+      ${list.length ? `<ul class="karma-list">${list.slice(-8).reverse().map((k) => `<li>${W.avatar(k.from, 'xs')} ${esc(W.karmaText(k).why)}</li>`).join('')}</ul>
+        ${list.length > 8 ? `<p class="hint">외 ${list.length - 8}건</p>` : ''}
+        <p class="hint">이 일들 때문에 휴가 중에 연락이 올 수 있어요. 근무할 때 마감을 지키고, 메시지에 답하고, 인수인계를 잘 해 두면 줄어요.</p>`
+        : '<p class="empty">깨끗하다. 이번 휴가는 조용할지도.</p>'}</section>`;
+  }
+  W.karmaCard = karmaCard;
 
   // ---------- 복귀 첫날 / 승진 첫날 ----------
   W.welcomeBack = () => {
@@ -254,6 +333,7 @@
       notes.push(`휴가 복귀. 밀린 업무 ${backlog}건이 업무함에 들어와 있다.`);
       if (b.souvenir) {
         W.applyEffects({ rep: 4 });
+        W.karma('souvenir', 'lee');
         W.msg.post('team', 'lee', `${b.place} 기념품 잘 먹을게요~!`);
         notes.push('기념품을 돌렸다. 평판 +4');
       }

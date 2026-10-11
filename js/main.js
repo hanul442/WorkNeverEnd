@@ -10,12 +10,14 @@
   function newGame(name, job, level) {
     W.s = { name, job, level, day: 1, stats: { stamina: 80, mental: 70, rep: 50, perf: 0, money: 300000 }, glossary: [], hangover: false, seq: 0 };
     W.initCareer();
+    W.initRelations();
     startDay();
   }
 
   function continueGame(saved) {
     W.s = { ...saved, seq: 0 };
     W.initCareer();
+    W.initRelations();
     W.beginDay();
   }
 
@@ -93,6 +95,7 @@
     }
     W.shuffle(window.CHATS).slice(0, L.chats).forEach((c, i) => q.push({ at: C.DAY_START + 15 + i * 85 + W.rand(40), kind: 'chat', data: c }));
     W.shuffle(window.CHATTER).slice(0, 3).forEach((c, i) => q.push({ at: C.DAY_START + 5 + i * 150 + W.rand(60), kind: 'chatter', data: c }));
+    W.scheduleRelations();
     W.shuffle(window.WEIRD_TASKS).slice(0, L.weird[0] + W.rand(L.weird[1] + 1)).forEach((w) => q.push({ at: C.DAY_START + 90 + W.rand(360), kind: 'weird', data: w }));
     q.sort((a, b) => a.at - b.at);
   }
@@ -110,9 +113,15 @@
       brief: tpl.brief || '',
       data: tpl.data || tpl,
       weird: !!tpl.weird,
+      urgent: !!tpl.urgent,
+      context: tpl.context || [],
       ui: {}
     };
     s.tasks.push(task);
+    if (tpl.cancelAfter) {
+      s.queue.push({ at: s.minute + tpl.cancelAfter, kind: 'cancel', data: { uid: task.uid, title: task.title, from: task.from } });
+      s.queue.sort((a, b) => a.at - b.at);
+    }
     if (notify) {
       W.msg.post(task.from, task.from, task.title, { kind: 'request', taskId: task.uid, title: task.title, due: task.due });
     }
@@ -127,6 +136,7 @@
     if (!W.taskOpen(uid)) return;
     W.s.activeTaskId = uid;
     W.s.lastResult = null;
+    W.maybeScheduleTwist(W.s.tasks.find((t) => t.uid === uid));
     setView('task');
   };
 
@@ -137,11 +147,12 @@
     let verdict;
     const L = W.level();
     if (q >= L.pass) {
-      effects.perf = 8;
+      effects.perf = task.urgent ? 12 : 8;
       effects.rep = 2;
       effects.mental = 1;
       verdict = '통과';
       s.done++;
+      W.karma(task.urgent ? 'urgent' : 'done', task.from, task.title);
     } else if (q >= L.ok) {
       effects.perf = 4;
       effects.mental = -3;
@@ -153,12 +164,13 @@
       effects.mental = -4;
       verdict = '반려';
       s.missed++;
+      W.karma('rejected', task.from, task.title);
     }
     if (task.weird) effects.mental = (effects.mental || 0) - 4;
     if (task.type === 'handover' && s.vacation) s.vacation.handoverQ = q;
     W.applyEffects(effects);
     W.learnTerms(task.title + ' ' + task.brief);
-    s.docs.unshift({ title: task.title, type: task.type, verdict, at: s.minute });
+    s.docs.unshift({ uid: task.uid, title: task.title, type: task.type, verdict, at: s.minute });
     s.lastResult = { task, verdict, note, effects };
 
     // 예산표가 통과하면 바로 품의를 올리라는 요청이 이어진다
@@ -245,6 +257,10 @@
       const ev = s.queue.shift();
       if (ev.kind === 'approval') { resolveApproval(ev.data); continue; }
       if (ev.kind === 'leave') { W.resolveLeave(ev.data); continue; }
+      if (ev.kind === 'twist') { W.applyTwist(ev.data); continue; }
+      if (ev.kind === 'cancel') { W.cancelTask(ev.data); continue; }
+      if (ev.kind === 'karma') { if (s.phase === 'work') W.karmaReturn(ev.data); continue; }
+      if (ev.kind === 'story') { if (s.phase === 'work') W.startStory(ev.data.id); continue; }
       if (s.phase !== 'work') continue;
       if (ev.kind === 'task') W.addTask(W.gen.random(), true);
       if (ev.kind === 'chat') W.msg.ask(ev.data);
@@ -264,6 +280,7 @@
         if (s.view === 'task') setView('inbox');
       }
       W.applyEffects({ perf: -5, rep: -3 });
+      W.karma('missed', t.from, t.title);
       W.msg.post(t.from, t.from, `${W.plain(t.title)} 마감 지났는데요...?`);
     });
     if (late.length && (s.view === 'inbox' || s.view === 'home')) renderMain();
@@ -286,6 +303,7 @@
       ...opts.map((o) => ({ label: o.label, onClick: () => {
         W.closeModal();
         W.applyEffects(o.correct ? { rep: 5, perf: 3 } : { rep: -4, mental: -3 });
+        if (o.correct) W.karma('meeting', m.people.find((p) => p !== 'me') || 'park');
         W.toast(o.correct ? '회의에서 존재감을 보였다.' : '회의실 공기가 싸해졌다.');
         W.resume();
         W.advance(m.dur * 60 - 10);
@@ -293,6 +311,7 @@
       { label: '급한 업무가 있어 불참하기', onClick: () => {
         W.closeModal();
         W.applyEffects({ rep: -5 });
+        W.karma('skipped', m.people.find((p) => p !== 'me') || 'park');
         W.msg.post(m.people.find((p) => p !== 'me') || 'park', m.people.find((p) => p !== 'me') || 'park', '회의 안 들어왔던데요?');
         W.resume();
       } }
@@ -309,6 +328,7 @@
     const effects = coffee ? { mental: 8, money: -4500 } : { mental: 10, stamina: -2 };
     let msg = coffee ? '아이스 아메리카노 한 잔. 살 것 같다.' : '옥상에서 한숨 돌렸다.';
     if (s.breaks > C.BREAK_LIMIT) {
+      W.karma('slacking', 'park');
       effects.rep = -4;
       msg += ' 그런데 팀장님이 "또 나가요?"라고 했다.';
     }
@@ -361,6 +381,9 @@
     // 아직 안 나온 휴가 결재는 퇴근 전에 결과가 나온다
     s.queue.filter((q) => q.kind === 'leave').forEach((q) => W.resolveLeave(q.data));
     s.queue = s.queue.filter((q) => q.kind !== 'leave');
+    // 끝내지 못한 일과 답하지 않은 메시지는 휴가 때 돌아온다
+    s.tasks.forEach((t) => W.karma('unfinished', t.from, t.title));
+    Object.values(s.rooms).forEach((r) => { if (r.pending && window.PEOPLE[r.id]) W.karma('ignored', r.id, '', W.person(r.id).name); });
     if (s.tasks.length) {
       s.missed += s.tasks.length;
       W.applyEffects({ perf: -4 * s.tasks.length });
@@ -381,6 +404,7 @@
       onClick: () => {
         W.applyEffects(o.effects);
         if (o.hangover) W.s.hangover = true;
+        W.karma(o.effects.rep > 0 ? 'dinner' : 'dinnerskip', 'park');
         W.closeModal();
         summary(o.result);
       }
@@ -507,6 +531,7 @@
       </div>`}
       <p class="hint">오늘 처리 ${s.done}건 · 용어 <span data-glossary-count>${s.glossary.length}</span>개</p>
       <p class="hint"><button type="button" class="link-btn" data-go="hr">연차 ${s.leave}일 · 승진 포인트 ${s.points}${W.nextRank() ? '/' + W.nextRank().need : ''}</button></p>
+      <p class="hint"><button type="button" class="link-btn" data-go="hr"><span class="up">덕 ${W.pendingGood().length}</span> · <span class="down">업보 ${W.pendingKarma().length}</span></button></p>
     </div>`;
   }
 
@@ -532,7 +557,7 @@
     }
     return list.map((t) => `<tr class="clickable" data-task="${t.uid}">
       <td>${typeChip(t.type)}</td>
-      <td class="title-cell">${t.weird ? '<span class="chip warn">이상한 업무</span> ' : ''}${esc(W.plain(t.title))}</td>
+      <td class="title-cell">${t.urgent ? '<span class="chip bad">긴급</span> ' : ''}${t.weird ? '<span class="chip warn">이상한 업무</span> ' : ''}${esc(W.plain(t.title).replace('[긴급] ', ''))}${t.twist ? ' <span class="chip warn">변경됨</span>' : ''}</td>
       <td class="from-cell">${W.avatar(t.from, 'xs')} ${esc(W.fullName(t.from))}</td>
       <td>${dueText(t)}</td></tr>`).join('');
   }
@@ -620,7 +645,9 @@
       <div class="crumbs"><button type="button" class="link-btn" data-go="inbox">업무함</button> › ${W.TYPE_LABEL[task.type]}</div>
       <h2 class="task-title">${W.rich(task.title)}</h2>
       <div class="task-meta">${W.avatar(task.from, 'xs')} ${esc(W.fullName(task.from))} 요청 · 마감 ${dueText(task)} ${typeChip(task.type)}</div>
+      ${task.twist ? `<div class="twist" role="status"><span class="chip warn">변경 요청</span> <strong>${esc(W.person(task.from).name)}:</strong> ${W.rich(task.twist)}</div>` : ''}
       ${task.brief ? `<blockquote class="brief">${W.rich(task.brief)}</blockquote>` : ''}
+      ${task.context && task.context.length ? `<div class="context"><span class="label">요청 배경</span><ul>${task.context.map((c) => `<li>${W.rich(c)}</li>`).join('')}</ul></div>` : ''}
       <div id="app-body"></div></section>`;
     W.apps[task.type].render(task, $('#app-body'), (q, note) => finishTask(task, q, note));
   }
