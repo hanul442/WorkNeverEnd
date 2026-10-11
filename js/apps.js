@@ -266,7 +266,7 @@
       const d = task.data;
       const line = ui(task, 'line', []);
       const cc = ui(task, 'cc', []);
-      const candidates = ['park', 'lee', 'choi', 'kang', 'song'];
+      const candidates = [...new Set([W.lead(), W.mate(), 'park', 'choi', 'kang', 'song'])];
       const stamp = (id, label) => `<div class="stamp"><span class="stamp-role">${label}</span>${W.avatar(id, 'sm')}<span>${esc(W.fullName(id))}</span></div>`;
       el.innerHTML = `
         <div class="approval-doc">
@@ -410,7 +410,7 @@
       const d = task.data;
       const to = ui(task, 'to', []);
       const cc = ui(task, 'cc', []);
-      const book = ['partner', 'park', 'lee', 'choi', 'jung', 'yoon', 'oh', 'song'];
+      const book = [...new Set(['partner', W.lead(), W.mate(), 'park', 'lee', 'choi', 'jung', 'yoon', 'oh', 'song'])];
       const chips = (field, list) => book.map((id) => `<button type="button" class="pick-btn ${list.includes(id) ? 'on' : ''}" data-${field}="${id}">
         ${W.avatar(id, 'xs')}${esc(W.person(id).name)} <small>${esc(W.person(id).dept)}</small></button>`).join('');
       el.innerHTML = `

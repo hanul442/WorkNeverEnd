@@ -24,7 +24,7 @@
 
   G.calendar = () => {
     const seeds = [
-      { title: '주간회의', people: ['park', 'lee', 'me'], dur: 1, day: 0, start: 10 },
+      { title: '주간회의', people: [W.lead(), W.mate(), 'me'], dur: 1, day: 0, start: 10 },
       { title: '외근 (A사 방문)', people: ['park'], dur: 3 },
       { title: '임원 보고', people: ['park', 'choi'], dur: 1 },
       { title: '본부 회의', people: ['choi'], dur: 2 },
@@ -34,8 +34,8 @@
       { title: '디자인 리뷰', people: ['lee', 'han'], dur: 1 },
       { title: '반차 (오후)', people: ['lee'], dur: 5, start: 13 },
       { title: '고객 인터뷰', people: ['han'], dur: 2 },
-      { title: '쿠폰 기능 회의', people: ['park', 'jung', 'me'], dur: 1 },
-      { title: '1:1 면담', people: ['park', 'me'], dur: 1 }
+      { title: '쿠폰 기능 회의', people: [...new Set([W.lead(), 'jung', 'me'])], dur: 1 },
+      { title: '1:1 면담', people: [W.lead(), 'me'], dur: 1 }
     ];
     const events = [];
     seeds.forEach((sd) => {
@@ -82,7 +82,7 @@
   };
 
   G.schedule = () => {
-    const pool = ['park', 'lee', 'jung', 'choi', 'han'];
+    const pool = [...new Set([W.lead(), W.mate(), 'park', 'lee', 'jung', 'choi', 'han'])];
     const todayIdx = (W.s.day - 1) % 5;
     for (let tries = 0; tries < 60; tries++) {
       const people = ['me', ...W.shuffle(pool).slice(0, 2 + W.rand(2))];
@@ -118,7 +118,7 @@
   // ---------- 예산 계산 ----------
   const BUDGETS = [
     {
-      purpose: '기획팀 하반기 워크숍',
+      purpose: '팀 하반기 워크숍',
       items: (n) => [
         { name: '버스 대절 (왕복)', unit: 450000, qty: 1, req: true },
         { name: '점심 도시락', unit: 12000, qty: n, req: true },
@@ -160,7 +160,7 @@
     return {
       type: 'budget',
       title: `${b.purpose} 예산표 작성`,
-      from: 'park',
+      from: W.lead(),
       minutes: 15,
       deadline: 180 + W.rand(60),
       brief: `견적 받은 항목으로 예산표를 채워 주세요. 견적은 모두 {{부가세}} 별도, 예산 한도는 부가세 포함 ${W.fmtMoney(limit)}이에요. 넘으면 필수 아닌 항목을 빼 주세요.`,
@@ -169,13 +169,13 @@
   };
 
   // ---------- 전자결재 ----------
-  W.approvalLine = (amount) => amount >= 5000000 ? ['park', 'choi', 'kang'] : amount >= 1000000 ? ['park', 'choi'] : ['park'];
+  W.approvalLine = (amount) => amount >= 5000000 ? [W.lead(), 'choi', 'kang'] : amount >= 1000000 ? [W.lead(), 'choi'] : [W.lead()];
   W.DOC_TYPES = ['품의서', '지출결의서', '휴가신청서', '출장신청서'];
 
   G.approval = (purpose, amount) => ({
     type: 'approval',
     title: `${purpose} {{품의}} 올리기`,
-    from: 'park',
+    from: W.lead(),
     minutes: 10,
     deadline: 120 + W.rand(60),
     brief: `방금 만든 예산표(부가세 포함 ${W.fmtMoney(amount)})로 전자결재를 올려 주세요. 돈을 쓰기 전에 승인받는 문서예요.`,
@@ -255,7 +255,7 @@
     return {
       type: 'report',
       title: d.title,
-      from: W.pick(['park', 'choi']),
+      from: W.pick([W.lead(), 'choi']),
       minutes: 15,
       deadline: 180 + W.rand(60),
       brief: '아래 데이터로 보고서를 완성해 주세요. 첫 줄은 결론부터({{두괄식}}), 숫자는 정확하게.',
@@ -275,11 +275,12 @@
 
   // 오늘 무작위로 들어올 업무 종류와 비중
   const WEIGHTS = { schedule: 2, budget: 2, report: 2, reorder: 2, mail: 2, review: 2, match: 2, expense: 1 };
-  const HARD = ['budget', 'report', 'expense'];
+  const weights = () => (W.team ? W.team().weights : WEIGHTS);
+  const HARD = ['budget', 'report', 'expense', 'quote'];
   G.random = () => {
     const bag = [];
     const early = W.s && W.s.day < W.level().hardFrom;
-    Object.entries(WEIGHTS).forEach(([k, n]) => {
+    Object.entries(weights()).forEach(([k, n]) => {
       if (early && HARD.includes(k)) return;
       for (let i = 0; i < n; i++) bag.push(k);
     });

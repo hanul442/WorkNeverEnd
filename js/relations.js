@@ -2,9 +2,13 @@
 (() => {
   const W = window.WNE;
   const esc = W.esc;
-  const BOSSES = ['park', 'choi', 'kang'];
-  // 메신저 동료 목록에 나오는 사람
-  W.COLLEAGUES = ['park', 'lee', 'han', 'jung', 'choi', 'kang', 'yoon', 'oh', 'song', 'partner'];
+  const BOSS_IDS = ['park', 'choi', 'kang', 'devlead', 'deslead', 'salelead'];
+  const BOSSES = { includes: (id) => BOSS_IDS.includes(id) };
+  // 메신저 동료 목록에 나오는 사람: 지금 팀 사람 먼저, 거쳐 온 팀 사람도
+  W.colleagues = () => {
+    const past = (W.s.pastTeams || []).flatMap((k) => [window.TEAMS[k].lead, window.TEAMS[k].mate]);
+    return [...new Set([W.lead(), W.mate(), ...past, 'park', 'lee', 'han', 'jung', 'choi', 'kang', 'yoon', 'oh', 'song', 'partner'])];
+  };
 
   W.initRelations = () => {
     const s = W.s;
@@ -35,6 +39,7 @@
   W.storyBeat = (id) => {
     const st = window.STORIES[id];
     if (!st) return null;
+    if (st.team && st.team !== W.s.job) return null;
     const i = W.s.story[id] || 0;
     const beat = st.beats[i];
     if (!beat) return null;
@@ -102,7 +107,7 @@
     if (!W.canTalk() || !window.PEOPLE[id] || id === 'me') return '';
     const s = W.s;
     const used = (k) => s.talked[`${id}:${k}`] === s.day;
-    const story = W.storyBeat(id) && !W.msg.room(id).pending;
+    const story = W.storyBeat(id) && !(W.s.rooms[id] && W.s.rooms[id].pending);
     const external = window.PEOPLE[id].external;
     const list = TOPICS.filter((t) => !external || t.key === 'small');
     return `<div class="talk"><span class="label">말 걸기</span><div class="talk-row">
@@ -253,6 +258,6 @@
   };
 
   W.relationCard = () => `<section class="card"><div class="card-head"><h2>동료 관계</h2></div>
-    <ul class="people-list">${W.COLLEAGUES.map((id) => `<li>${W.avatar(id, 'xs')} <span>${esc(W.fullName(id))} <small class="muted">${esc(W.person(id).dept)}</small></span>${tierChip(id)}</li>`).join('')}</ul>
+    <ul class="people-list">${W.colleagues().map((id) => `<li>${W.avatar(id, 'xs')} <span>${esc(W.fullName(id))} <small class="muted">${esc(W.person(id).dept)}</small></span>${tierChip(id)}</li>`).join('')}</ul>
     <p class="hint">메신저에서 사람을 눌러 먼저 말을 걸 수 있어요. 호감도가 높으면 업무를 도와주고, 이야기가 이어져요.</p></section>`;
 })();

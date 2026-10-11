@@ -96,6 +96,7 @@ window.MATCH_TASKS = [
 window.REORDER_DOCS = [
   {
     title: '신규 이벤트 기획서 목차 정리',
+    teams: ['기획'],
     from: 'park',
     feedback: '흐름이 이상해요. 왜 하는지부터 나와야죠.',
     sections: [

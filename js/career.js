@@ -102,7 +102,7 @@
     const questions = W.shuffle(pool).slice(0, 3);
     let right = 0;
     // 면접관과의 관계가 심사 분위기를 바꾼다
-    const bossRel = (W.rel('choi') + W.rel('kang') + W.rel('park')) / 3;
+    const bossRel = (W.rel('choi') + W.rel('kang') + W.rel(W.lead())) / 3;
     const ally = s.flags.choiPick || bossRel >= 20;
     const foe = !ally && bossRel <= -20;
     const mood = ally ? '최영수 부장님이 "이 친구 괜찮아요"라며 분위기를 풀어 준다. (보기 하나가 줄어요)'
@@ -171,11 +171,10 @@
         <label class="check"><input type="checkbox" id="lv-doc" checked> 인수인계서 작성하기 (업무 하나가 추가돼요. 잘 쓸수록 휴가 중 연락이 줄어요)</label>
         <label class="label" for="lv-deputy">${W.rich('{{직무대행}}')}</label>
         <select id="lv-deputy" class="input">
-          <option value="lee">이서연 대리 (기획팀)</option>
-          <option value="han">한수빈 사원 (디자인팀)</option>
+          ${[...new Set([W.mate(), W.mate() === 'han' ? 'lee' : 'han'])].map((id) => `<option value="${id}">${esc(W.fullName(id))} (${esc(W.person(id).dept)})</option>`).join('')}
           <option value="">지정 안 함</option>
         </select>
-        <p class="hint">결재선: 박지훈 팀장. 지금 가진 돈 ${W.fmtMoney(s.stats.money)}. 경비는 출발할 때와 매일 빠져나가요.</p>
+        <p class="hint">결재선: ${esc(W.fullName(W.lead()))}. 지금 가진 돈 ${W.fmtMoney(s.stats.money)}. 경비는 출발할 때와 매일 빠져나가요.</p>
         ${W.pendingKarma().length || s.tasks.length ? `<div class="karma-box"><span class="label">휴가 전에 확인</span>
           <p>휴가 중 연락으로 돌아올 수 있는 일: 쌓인 업보 ${W.pendingKarma().length}건${s.tasks.length ? `, 오늘 퇴근 전까지 못 끝내면 업무함 ${s.tasks.length}건도` : ''}.</p></div>` : ''}
       </div>`,
@@ -211,7 +210,7 @@
     if (s.stats.rep < 30) {
       doc.status = '반려';
       doc.reason = '평판이 너무 낮음';
-      W.msg.post('park', 'park', '{me}, 요즘 일 처리가 좀 밀려 있는 것 같은데... 휴가는 다음 주에 다시 얘기해요.');
+      W.msg.post(W.lead(), W.lead(), '{me}, 요즘 일 처리가 좀 밀려 있는 것 같은데... 휴가는 다음 주에 다시 얘기해요.');
       if (s.view === 'approvals' || s.view === 'hr') W.renderMain();
       return;
     }
@@ -219,11 +218,11 @@
     const d = window.DESTINATIONS[plan.dest];
     s.vacation = { ...plan, place: W.pick(d.places), start: s.day + 1, handoverQ: 0, souvenir: false, log: [], contacts: 0, replied: 0 };
     s.leave -= plan.days;
-    W.msg.post('park', 'park', plan.days >= 3
+    W.msg.post(W.lead(), W.lead(), plan.days >= 3
       ? '휴가 승인했어요. 3일이나... 아니 잘 다녀와요. {{인수인계}}는 확실히 해 주고요.'
       : '휴가 승인했어요. 잘 쉬고 와요. 가기 전에 {{인수인계}}만 부탁해요.');
     if (plan.doc) {
-      setTimeout(() => W.addTask(W.gen.handover(plan.deputy), true, 'park'), 800);
+      setTimeout(() => W.addTask(W.gen.handover(plan.deputy), true, W.lead()), 800);
     }
     if (s.view === 'approvals' || s.view === 'hr') W.renderMain();
     W.renderChrome();
@@ -257,6 +256,7 @@
           <p class="hint">${W.rich('{{인사평가}}')} 등급마다 포인트가 쌓여요. S +3, A +2, B +1, C 0, D −1. 포인트가 차면 승진 심사(실무 용어 면접)를 봅니다.</p>
         </section>
         <section class="card"><div class="card-head"><h2>근태 · 휴가</h2></div>${vacInfo}</section>
+        ${W.transferCard()}
         ${W.ledgerCard()}
         ${W.relationCard()}
         <section class="card"><div class="card-head"><h2>직급 체계</h2></div>

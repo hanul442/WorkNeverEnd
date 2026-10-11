@@ -12,6 +12,10 @@ window.PEOPLE = {
   oh: { name: '오현주', rank: '대리', dept: '총무팀', color: 2 },
   song: { name: '송도윤', rank: '과장', dept: '재무팀', color: 5 },
   partner: { name: '김민지', rank: '팀장', dept: 'A사 마케팅팀', color: 8, external: true },
+  devlead: { name: '김도현', rank: '팀장', dept: '개발팀', color: 6 },
+  deslead: { name: '윤서아', rank: '팀장', dept: '디자인팀', color: 7 },
+  salelead: { name: '장민석', rank: '팀장', dept: '영업팀', color: 4 },
+  sales: { name: '오세훈', rank: '대리', dept: '영업팀', color: 3 },
   mom: { name: '엄마', rank: '', dept: '가족', color: 3, external: true },
   friend: { name: '민수', rank: '', dept: '대학 동기', color: 6, external: true }
 };

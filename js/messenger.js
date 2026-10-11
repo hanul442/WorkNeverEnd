@@ -111,7 +111,7 @@
     const rooms = Object.values(W.s.rooms).sort((a, b) => b.last - a.last);
     const head = `<div class="msg-head"><h2>메신저</h2><button type="button" class="link-btn" data-dir>${W.s.showDir ? '대화 목록' : '동료 목록 · 말 걸기'}</button></div>`;
     if (W.s.showDir) {
-      return head + `<ul class="room-list">${W.COLLEAGUES.map((id) => `<li><button type="button" class="room-item" data-room="${id}">
+      return head + `<ul class="room-list">${W.colleagues().map((id) => `<li><button type="button" class="room-item" data-room="${id}">
         ${W.avatar(id)}<span class="room-main"><span class="room-name">${esc(W.fullName(id))} <small>${esc(W.person(id).dept)}</small></span>
         <span class="room-preview">${W.storyBeat(id) ? '할 이야기가 있는 것 같다' : '호감도 ' + W.rel(id)}</span></span>
         <span class="room-side">${W.tierChip(id)}${W.storyBeat(id) ? '<span class="dot" title="이야기"></span>' : ''}</span></button></li>`).join('')}</ul>`;

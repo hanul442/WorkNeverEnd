@@ -160,6 +160,7 @@ window.STORIES = {
 
   jung: {
     title: '정민호 선임과 기획서 전쟁',
+    team: '기획',
     beats: [
       {
         minDay: 1, minRel: -100,
@@ -217,6 +218,7 @@ window.STORIES = {
 
   park: {
     title: '박지훈 팀장의 사정',
+    team: '기획',
     beats: [
       {
         minDay: 2, minRel: -100,
@@ -244,6 +246,103 @@ window.STORIES = {
           deal: {
             text: '킥오프 일정부터 잡아 줘요. 참석자는 개발, 디자인 다 들어와야 해요.',
             options: [{ label: '네, 캘린더 보고 잡겠습니다.', reply: '부탁해요.', rel: 2, spawn: 'schedule' }]
+          }
+        }
+      }
+    ]
+  },
+
+  devlead: {
+    title: '김도현 팀장과 새벽 장애',
+    team: '개발',
+    beats: [
+      {
+        minDay: 1, minRel: -100,
+        nodes: {
+          start: {
+            text: '{me}, 우리 팀 규칙 하나. {{배포}} 전에 제일 먼저 확인하는 게 뭐예요?',
+            options: [
+              { label: '테스트가 다 통과했는지랑 {{롤백}} 방법부터 확인합니다.', reply: '좋아요. 그거면 반은 먹고 들어가요.', rel: 10, effects: { rep: 3 } },
+              { label: '일단 올리고 문제 생기면 고치면 되지 않나요?', reply: '...그러다 새벽에 전화 받아요. 우리 팀에선 안 돼요.', rel: -8, karma: 'rude' },
+              { label: '잘 모르겠습니다. 알려 주세요.', reply: '솔직해서 좋네요. 배포 체크리스트부터 읽어 봐요.', rel: 3, spawn: 'reorder' }
+            ]
+          }
+        }
+      },
+      {
+        minDay: 3, minRel: 10,
+        nodes: {
+          start: {
+            text: '(밤 11시) {me}, 자요? 결제 서버 터졌어요. 지금 들어올 수 있어요?',
+            options: [
+              { label: '바로 접속하겠습니다. 로그부터 볼게요.', reply: '고마워요. 같이 보면 금방 잡을 거예요.', rel: 12, flag: 'devNight', effects: { stamina: -12, perf: 10 } },
+              { label: '죄송한데 내일 아침에 바로 볼게요.', reply: '...알겠어요. 혼자 해 볼게요.', rel: -6, effects: { mental: -3 } }
+            ]
+          }
+        }
+      }
+    ]
+  },
+
+  deslead: {
+    title: '윤서아 팀장과 빨간색 사건',
+    team: '디자인',
+    beats: [
+      {
+        minDay: 1, minRel: -100,
+        nodes: {
+          start: {
+            text: '{me}, 디자인 {{피드백}} 받을 때 제일 중요한 게 뭐라고 생각해요?',
+            options: [
+              { label: '그 피드백에 근거가 있는지, 목적에 맞는지요.', reply: '정답. 디자인은 취향이 아니라 근거예요.', rel: 10, effects: { rep: 3 } },
+              { label: '윗분 말씀은 무조건 반영하는 거요.', reply: '그러다 누더기 돼요. 같이 바꿔 봐요.', rel: -2 },
+              { label: '제 감각을 믿는 거요.', reply: '감각도 중요한데, 설명할 수 있어야 해요.', rel: 2 }
+            ]
+          }
+        }
+      },
+      {
+        minDay: 3, minRel: 10,
+        nodes: {
+          start: {
+            text: '대표님이 메인 배너를 전부 빨간색으로 바꾸래요... 브랜드 컬러는 파란색인데. {me} 생각은요?',
+            options: [
+              { label: '빨간색 강조 버전을 하나 더 만들고, 클릭률 비교 데이터로 설득해 봐요.', reply: '오, 좋아요. {{A/B 테스트}}로 가요.', rel: 12, flag: 'redTest', effects: { perf: 6, mental: -3 } },
+              { label: '대표님 말씀이니까 그냥 바꾸죠.', reply: '...그래요. 가이드는 다음에 지키죠 뭐.', rel: -4, effects: { mental: -5 } }
+            ]
+          }
+        }
+      }
+    ]
+  },
+
+  salelead: {
+    title: '장민석 팀장의 분기 목표',
+    team: '영업',
+    beats: [
+      {
+        minDay: 1, minRel: -100,
+        nodes: {
+          start: {
+            text: '{me}, 이번 분기 목표 70%야. 네 {{파이프라인}}에 뭐 있어?',
+            options: [
+              { label: '핫 리드 2건 미팅 잡았고, 웜 리드는 이번 주 팔로업합니다.', reply: '좋아. 숫자로 말하니까 좋네.', rel: 10, effects: { rep: 3 } },
+              { label: '열심히 하고 있습니다!', reply: '열심히 말고 숫자. 내일까지 정리해 와.', rel: -3, spawn: 'report' },
+              { label: '아직 신입이라 없습니다...', reply: '그럼 리드 분류부터 해. 오늘 들어온 거 줄게.', rel: 0, spawn: 'classify' }
+            ]
+          }
+        }
+      },
+      {
+        minDay: 3, minRel: 10,
+        nodes: {
+          start: {
+            text: 'B유통이 할인 30% 안 해 주면 경쟁사 간대. 어떻게 할래?',
+            options: [
+              { label: '할인 대신 교육을 무상으로 넣어서 가치를 올려 보겠습니다.', reply: '그게 영업이지. 성공하면 크게 쳐 줄게.', rel: 12, flag: 'saleDeal', effects: { perf: 12 } },
+              { label: '30% 해 주시죠. 계약이 우선이니까요.', reply: '...그럼 남는 게 없어. 팀 마진 망가져.', rel: -6, effects: { rep: -4 } },
+              { label: '팀장님이 직접 통화해 주실 수 있을까요?', reply: '그래, 이번엔 내가 할게. 다음엔 네가 해.', rel: 2 }
+            ]
           }
         }
       }

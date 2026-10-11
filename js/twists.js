@@ -46,7 +46,7 @@
       const d = task.data;
       const ev = W.s.calendar.find((e) => e.id === d.eventId);
       if (Math.random() < 0.5) {
-        const extra = W.shuffle(['park', 'lee', 'jung', 'choi', 'han', 'kang'].filter((p) => !d.people.includes(p)));
+        const extra = W.shuffle([...new Set([W.lead(), W.mate(), 'park', 'lee', 'jung', 'choi', 'han', 'kang'])].filter((p) => !d.people.includes(p)));
         for (const p of extra) {
           const tryTask = { data: { ...d, people: [...d.people, p] } };
           if (validSlots(tryTask) >= 1) {
@@ -104,7 +104,7 @@
     mail(task) {
       const d = task.data;
       if (Math.random() < 0.5) {
-        const add = ['choi', 'park', 'lee', 'song'].find((p) => !d.to.includes(p) && !d.cc.includes(p) && p !== task.from);
+        const add = ['choi', W.lead(), W.mate(), 'song'].find((p) => !d.to.includes(p) && !d.cc.includes(p) && p !== task.from);
         if (add) {
           task.data = { ...d, cc: [...d.cc, add] };
           return `아, 그 메일 ${W.fullName(add)}님도 {{참조}}로 넣어 주세요. 위에서 보고 싶어 하세요.`;

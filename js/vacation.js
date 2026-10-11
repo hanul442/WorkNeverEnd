@@ -8,11 +8,11 @@
   W.TYPE_LABEL.handover = '인수인계';
 
   W.gen.handover = (deputy) => {
-    const items = W.shuffle(window.HANDOVER_ITEMS).slice(0, 4);
+    const items = W.shuffle(window.HANDOVER_ITEMS).slice(0, 4).map((it) => ({ ...it, right: W.teamPerson(it.right) }));
     return {
       type: 'handover',
       title: '휴가 전 {{인수인계}}서 작성',
-      from: 'park',
+      from: W.lead(),
       minutes: 15,
       deadline: Math.max(60, 18 * 60 - W.s.minute),
       brief: `진행 중인 일마다 맡길 사람을 정해 주세요. 일의 내용에 맞는 부서 담당자에게 넘겨야 휴가 중에 연락이 덜 와요.${deputy ? ` {{직무대행}}: ${W.fullName(deputy)}.` : ''}`,
@@ -31,7 +31,7 @@
           ${d.items.map((it, i) => `<tr><td>${W.rich(it.text)}</td><td>
             <select class="input" data-ui="to${i}" aria-label="맡길 사람">
               <option value="">선택하세요</option>
-              ${window.HANDOVER_TO.map((id) => `<option value="${id}" ${ui('to' + i) === id ? 'selected' : ''}>${esc(W.person(id).dept)} ${esc(W.fullName(id))}</option>`).join('')}
+              ${[...new Set([W.mate(), ...window.HANDOVER_TO])].map((id) => `<option value="${id}" ${ui('to' + i) === id ? 'selected' : ''}>${esc(W.person(id).dept)} ${esc(W.fullName(id))}</option>`).join('')}
             </select></td></tr>`).join('')}
           </tbody></table>
           <fieldset><legend>휴가 중 연락 기준</legend>
@@ -85,7 +85,7 @@
     s.vacDay = { contacts: 0, replied: 0, reasons: [] };
     // 휴가 첫날, 준비를 안 한 대가가 업보로 쌓인다
     if (s.day === v.start) {
-      if (!v.doc) W.karma('nohandover', 'park');
+      if (!v.doc) W.karma('nohandover', W.lead());
       if (!v.auto) W.karma('noauto', 'partner');
     }
     const nth = s.day - v.start + 1;
@@ -320,8 +320,8 @@
     const s = W.s;
     const notes = [];
     if (s.promotedTo) {
-      W.msg.post('team', 'park', `오늘부터 ${s.name} ${s.promotedTo}님입니다. 다들 축하해 주세요!`);
-      W.msg.post('team', 'lee', `${s.promotedTo}님 축하드려요!! 턱 쏘시는 거죠? ㅎㅎ`);
+      W.msg.post('team', W.lead(), `오늘부터 ${s.name} ${s.promotedTo}님입니다. 다들 축하해 주세요!`);
+      W.msg.post('team', W.mate(), `${s.promotedTo}님 축하드려요!! 턱 쏘시는 거죠? ㅎㅎ`);
       notes.push(`${s.promotedTo} 첫 출근. 명함이 바뀌었다.`);
       s.promotedTo = null;
     }
@@ -329,12 +329,12 @@
       const b = s.back;
       const backlog = 1 + Math.min(2, b.days);
       for (let i = 0; i < backlog; i++) W.addTask(W.gen.random(), true);
-      W.msg.post('park', 'park', '휴가 잘 다녀왔어요? 밀린 것들 업무함에 넣어 뒀어요.');
+      W.msg.post(W.lead(), W.lead(), '휴가 잘 다녀왔어요? 밀린 것들 업무함에 넣어 뒀어요.');
       notes.push(`휴가 복귀. 밀린 업무 ${backlog}건이 업무함에 들어와 있다.`);
       if (b.souvenir) {
         W.applyEffects({ rep: 4 });
-        W.karma('souvenir', 'lee');
-        W.msg.post('team', 'lee', `${b.place} 기념품 잘 먹을게요~!`);
+        W.karma('souvenir', W.mate());
+        W.msg.post('team', W.mate(), `${b.place} 기념품 잘 먹을게요~!`);
         notes.push('기념품을 돌렸다. 평판 +4');
       }
       s.back = null;

@@ -21,9 +21,9 @@
       <span class="field-label">부서</span>
       <div class="job-list">
         <button class="job selected" data-job="기획" type="button"><strong>기획팀</strong><span>기획서, 보고서, 일정 조율</span></button>
-        <button class="job" type="button" disabled><strong>개발팀</strong><span>준비 중</span></button>
-        <button class="job" type="button" disabled><strong>디자인팀</strong><span>준비 중</span></button>
-        <button class="job" type="button" disabled><strong>영업팀</strong><span>준비 중</span></button>
+        <button class="job" data-job="개발" type="button"><strong>개발팀</strong><span>버그 분류, 배포 준비, 코드 리뷰</span></button>
+        <button class="job" data-job="디자인" type="button"><strong>디자인팀</strong><span>시안 피드백 정리, 디자인 검수</span></button>
+        <button class="job" data-job="영업" type="button"><strong>영업팀</strong><span>견적서, 리드 관리, 매출 보고</span></button>
       </div>
       <span class="field-label">난이도</span>
       <div class="job-list level-list">
@@ -73,11 +73,13 @@
   <script src="js/data/vacation.js"></script>
   <script src="js/data/context.js"></script>
   <script src="js/data/stories.js"></script>
+  <script src="js/data/teams.js"></script>
   <script src="js/ai.js"></script>
   <script src="js/core.js"></script>
   <script src="js/generators.js"></script>
   <script src="js/apps.js"></script>
   <script src="js/messenger.js"></script>
+  <script src="js/teamwork.js"></script>
   <script src="js/twists.js"></script>
   <script src="js/relations.js"></script>
   <script src="js/career.js"></script>

@@ -11,6 +11,7 @@
     W.s = { name, job, level, day: 1, stats: { stamina: 80, mental: 70, rep: 50, perf: 0, money: 300000 }, glossary: [], hangover: false, seq: 0 };
     W.initCareer();
     W.initRelations();
+    W.applyTeam();
     startDay();
   }
 
@@ -18,6 +19,7 @@
     W.s = { ...saved, seq: 0 };
     W.initCareer();
     W.initRelations();
+    W.applyTeam();
     W.beginDay();
   }
 
@@ -51,9 +53,9 @@
   function startDay() {
     const s = W.s;
     W.resetDay();
+    const morning = W.applyTransfer();
     s.calendar = W.gen.calendar();
 
-    const morning = [];
     if (s.hangover) {
       s.stats.stamina = W.clamp(s.stats.stamina - 15, 0, 100);
       morning.push('어제 회식 여파로 머리가 깨질 것 같다. 체력 −15');
@@ -195,7 +197,7 @@
   };
 
   function resolveApproval({ doc, errors, task }) {
-    const approver = task.data.docType === '지출결의서' ? 'song' : 'park';
+    const approver = task.data.docType === '지출결의서' ? 'song' : W.lead();
     if (!errors.length) {
       doc.status = '승인';
       W.msg.post(approver, approver, `전자결재 승인했어요. "${doc.title}"`);
@@ -257,15 +259,16 @@
       const ev = s.queue.shift();
       if (ev.kind === 'approval') { resolveApproval(ev.data); continue; }
       if (ev.kind === 'leave') { W.resolveLeave(ev.data); continue; }
+      if (ev.kind === 'transfer') { W.resolveTransfer(ev.data); continue; }
       if (ev.kind === 'twist') { W.applyTwist(ev.data); continue; }
       if (ev.kind === 'cancel') { W.cancelTask(ev.data); continue; }
       if (ev.kind === 'karma') { if (s.phase === 'work') W.karmaReturn(ev.data); continue; }
       if (ev.kind === 'story') { if (s.phase === 'work') W.startStory(ev.data.id); continue; }
       if (s.phase !== 'work') continue;
       if (ev.kind === 'task') W.addTask(W.gen.random(), true);
-      if (ev.kind === 'chat') W.msg.ask(ev.data);
-      if (ev.kind === 'chatter') W.msg.post('team', ev.data.from, ev.data.text);
-      if (ev.kind === 'weird') W.msg.weird(ev.data);
+      if (ev.kind === 'chat') W.msg.ask({ ...ev.data, from: W.teamPerson(ev.data.from) });
+      if (ev.kind === 'chatter') W.msg.post('team', W.teamPerson(ev.data.from), ev.data.text);
+      if (ev.kind === 'weird') W.msg.weird({ ...ev.data, from: W.teamPerson(ev.data.from) });
     }
   }
 
@@ -303,7 +306,7 @@
       ...opts.map((o) => ({ label: o.label, onClick: () => {
         W.closeModal();
         W.applyEffects(o.correct ? { rep: 5, perf: 3 } : { rep: -4, mental: -3 });
-        if (o.correct) W.karma('meeting', m.people.find((p) => p !== 'me') || 'park');
+        if (o.correct) W.karma('meeting', m.people.find((p) => p !== 'me') || W.lead());
         W.toast(o.correct ? '회의에서 존재감을 보였다.' : '회의실 공기가 싸해졌다.');
         W.resume();
         W.advance(m.dur * 60 - 10);
@@ -311,8 +314,9 @@
       { label: '급한 업무가 있어 불참하기', onClick: () => {
         W.closeModal();
         W.applyEffects({ rep: -5 });
-        W.karma('skipped', m.people.find((p) => p !== 'me') || 'park');
-        W.msg.post(m.people.find((p) => p !== 'me') || 'park', m.people.find((p) => p !== 'me') || 'park', '회의 안 들어왔던데요?');
+        const other = m.people.find((p) => p !== 'me') || W.lead();
+        W.karma('skipped', other);
+        W.msg.post(other, other, '회의 안 들어왔던데요?');
         W.resume();
       } }
     ]);
@@ -328,7 +332,7 @@
     const effects = coffee ? { mental: 8, money: -4500 } : { mental: 10, stamina: -2 };
     let msg = coffee ? '아이스 아메리카노 한 잔. 살 것 같다.' : '옥상에서 한숨 돌렸다.';
     if (s.breaks > C.BREAK_LIMIT) {
-      W.karma('slacking', 'park');
+      W.karma('slacking', W.lead());
       effects.rep = -4;
       msg += ' 그런데 팀장님이 "또 나가요?"라고 했다.';
     }
@@ -380,7 +384,8 @@
     s.phase = 'evening';
     // 아직 안 나온 휴가 결재는 퇴근 전에 결과가 나온다
     s.queue.filter((q) => q.kind === 'leave').forEach((q) => W.resolveLeave(q.data));
-    s.queue = s.queue.filter((q) => q.kind !== 'leave');
+    s.queue.filter((q) => q.kind === 'transfer').forEach((q) => W.resolveTransfer(q.data));
+    s.queue = s.queue.filter((q) => q.kind !== 'leave' && q.kind !== 'transfer');
     // 끝내지 못한 일과 답하지 않은 메시지는 휴가 때 돌아온다
     s.tasks.forEach((t) => W.karma('unfinished', t.from, t.title));
     Object.values(s.rooms).forEach((r) => { if (r.pending && window.PEOPLE[r.id]) W.karma('ignored', r.id, '', W.person(r.id).name); });
@@ -399,12 +404,12 @@
 
   function teamDinner() {
     const d = window.TEAM_DINNER;
-    W.openModal(`<p class="eyebrow">퇴근 직전</p><h3>회식 소집</h3><p>${esc(d.text)}</p>`, d.options.map((o) => ({
+    W.openModal(`<p class="eyebrow">퇴근 직전</p><h3>회식 소집</h3><p>${esc(d.text.replace('박 팀장', W.person(W.lead()).name.slice(0, 1) + ' 팀장'))}</p>`, d.options.map((o) => ({
       label: o.label,
       onClick: () => {
         W.applyEffects(o.effects);
         if (o.hangover) W.s.hangover = true;
-        W.karma(o.effects.rep > 0 ? 'dinner' : 'dinnerskip', 'park');
+        W.karma(o.effects.rep > 0 ? 'dinner' : 'dinnerskip', W.lead());
         W.closeModal();
         summary(o.result);
       }
@@ -688,6 +693,7 @@
       if (b) return takeBreak(b.dataset.break);
       if (e.target.closest('[data-leave]')) return leaveOffice();
       if (e.target.closest('[data-leave-form]')) return W.openLeaveForm();
+      if (e.target.closest('[data-transfer]')) return W.openTransfer();
     });
 
     // 업무 앱 입력값은 task.ui 에 저장
