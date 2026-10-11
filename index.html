@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WorkNeverEnd</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 시작 화면 -->
+  <section id="start-screen" class="start">
+    <div class="start-card">
+      <p class="eyebrow">회사 생활 시뮬레이션</p>
+      <h1>WorkNeverEnd</h1>
+      <p class="lead">출근해서 업무를 쳐내고, 메신저에 답하고, 이상한 부탁을 버티고, 퇴근 후 회식까지. 오늘도 일은 끝나지 않는다.</p>
+      <h2>직무를 고르세요</h2>
+      <div class="job-list">
+        <button class="job selected" data-job="기획" type="button">
+          <strong>기획</strong><span>기획서, 회의록, 지표 보고</span>
+        </button>
+        <button class="job" type="button" disabled><strong>개발</strong><span>준비 중</span></button>
+        <button class="job" type="button" disabled><strong>디자인</strong><span>준비 중</span></button>
+        <button class="job" type="button" disabled><strong>영업</strong><span>준비 중</span></button>
+      </div>
+      <div class="start-actions">
+        <button id="btn-start" class="primary" type="button">출근하기</button>
+        <button id="btn-continue" class="secondary" type="button" hidden>이어서 출근하기</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 게임 화면 -->
+  <section id="game-screen" class="game" hidden>
+    <header class="topbar">
+      <div class="when">
+        <span id="day-label" class="day">1일차</span>
+        <span id="clock" class="clock">09:00</span>
+        <span id="phase-label" class="phase"></span>
+      </div>
+      <div class="stats" id="stats"></div>
+    </header>
+
+    <nav class="mobile-tabs" aria-label="화면 전환">
+      <button type="button" data-tab="tasks" class="active">업무</button>
+      <button type="button" data-tab="work">작업</button>
+      <button type="button" data-tab="chat">메신저 <span id="chat-badge" class="badge" hidden>0</span></button>
+    </nav>
+
+    <main class="desk">
+      <section class="panel tasks-panel" data-panel="tasks">
+        <h2>오늘의 업무</h2>
+        <ul id="task-list" class="task-list"></ul>
+      </section>
+
+      <section class="panel work-panel" data-panel="work">
+        <div id="work-area" class="work-area"></div>
+      </section>
+
+      <section class="panel chat-panel" data-panel="chat">
+        <h2>사내 메신저</h2>
+        <div id="chat-list" class="chat-list"></div>
+      </section>
+    </main>
+
+    <footer class="actions">
+      <button type="button" id="btn-coffee">커피타임 <small>15분</small></button>
+      <button type="button" id="btn-smoke">담배타임 <small>10분</small></button>
+      <button type="button" id="btn-glossary">용어집 <small id="glossary-count">0</small></button>
+    </footer>
+  </section>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="modal" class="modal">
+    <div id="modal-body"></div>
+  </dialog>
+
+  <script src="js/data/terms.js"></script>
+  <script src="js/data/tasks.js"></script>
+  <script src="js/data/messages.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
