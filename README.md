@@ -15,6 +15,19 @@ python3 -m http.server 8000
 
 테스트할 때는 주소 뒤에 `?speed=20`을 붙이면 게임 시간이 20배 빨라집니다.
 
+## 앱으로 설치하기 (PWA)
+
+GitHub Pages 주소 https://hanul442.github.io/WorkNeverEnd/ 에서 열면 앱처럼 설치할 수 있습니다.
+
+- 안드로이드 크롬: 메뉴 ⋮ → "앱 설치" 또는 "홈 화면에 추가"
+- 아이폰 사파리: 공유 버튼 → "홈 화면에 추가"
+- PC 크롬·엣지: 주소창 오른쪽의 설치 아이콘
+
+한 번 열고 나면 인터넷 없이도 플레이됩니다. 저장은 기기 브라우저에 남습니다.
+설치한 앱에서는 AI 대화가 꺼지고 선택지로 플레이합니다. AI 대화는 claude.ai 플레이 링크에서만 됩니다 (아래 "AI 대화" 참고).
+
+GitHub Pages 켜는 법: 레포 Settings → Pages → Source를 "Deploy from a branch", 브랜치 `claude/project-thread-3dcd21`, 폴더 `/ (root)`로 저장.
+
 ## 2단계: 사원의 하루
 
 사내 그룹웨어처럼 생긴 화면에서 기획팀 사원의 하루를 보냅니다. 상단 메뉴는 홈, 업무함, 메신저, 캘린더, 전자결재, 문서함, 용어집입니다.
@@ -115,6 +128,7 @@ python3 -m http.server 8000
 | `js/relations.js` | 호감도, 동료 이야기, 먼저 말 걸기, 덕·업보가 돌아오는 일 |
 | `js/teamwork.js` | 부서별 업무, 분류·견적서 업무, 팀 이동 |
 | `js/office.js` | 장면(컷씬), 단톡방, 휴식·점심·야근 장면, 호출, 소문과 정보 |
+| `sw.js`, `manifest.webmanifest`, `js/pwa.js` | 앱 설치(PWA)와 오프라인 플레이 |
 | `js/ai.js` | AI 대화 (자유 대화, 직접 쓴 답 채점) |
 | `js/data/` | 사람, 용어, 업무, 메시지, 공지, 직급, 휴가지, 부서 데이터 |
 
