@@ -103,6 +103,7 @@ p { margin: 0 0 8px; }
 .input.short { width: 96px; }
 textarea.input { resize: vertical; }
 .hint { color: var(--text-2); font-size: 12.5px; }
+.hint.help { background: var(--accent-soft); color: var(--text); border-radius: var(--radius); padding: 8px 10px; margin: 0 0 10px; }
 .muted { color: var(--text-2); }
 .empty { color: var(--text-2); }
 .error { color: var(--bad); font-weight: 500; }
@@ -144,6 +145,7 @@ textarea.input { resize: vertical; }
 .job-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .job { text-align: left; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); display: flex; flex-direction: column; }
 .job span { color: var(--text-2); font-size: 12.5px; }
+.level-list { grid-template-columns: repeat(3, 1fr); }
 .job.selected { border-color: var(--accent); background: var(--accent-soft); }
 .start-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 
@@ -390,6 +392,7 @@ legend { font-weight: 700; margin-bottom: 6px; padding: 0; }
 }
 
 @media (max-width: 560px) {
+  .level-list { grid-template-columns: 1fr; }
   :root { --hour: 40px; }
   .start-card { padding: 24px 16px; }
   .task-window { padding: 14px; }

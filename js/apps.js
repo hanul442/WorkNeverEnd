@@ -25,6 +25,7 @@
         </div>
         ${grid}
         <p class="hint">빈 칸을 누르거나 파란 회의를 끌어다 놓으면 새 시간이 표시돼요. 지금: ${window.WEEKDAYS[ev.day]} ${ev.start}시 (${d.dur}시간)</p>
+        ${W.level().help ? '<p class="hint help">고르는 법: 참석자 일정과 겹치지 않고, 점심시간(12~13시)과 이미 지난 시간을 피하고, 요청에 적힌 조건까지 맞는 빈 칸을 찾으세요.</p>' : ''}
         ${task.ui.error ? `<p class="error">${esc(task.ui.error)}</p>` : ''}
         <div class="row">
           <button class="btn primary" type="button" data-act="confirm" ${slot ? '' : 'disabled'}>
@@ -188,7 +189,10 @@
           <td class="center"><input type="checkbox" data-ui="inc${i}" ${included ? 'checked' : ''} ${it.req ? 'disabled' : ''} aria-label="${esc(it.name)} 포함"></td>
         </tr>`;
       }).join('');
-      el.innerHTML = `
+      const help = W.level().help
+        ? `<p class="hint help">계산 순서: 금액 = 단가 × 수량 → 소계 = 포함한 금액의 합 → 부가세 = 소계 × 0.1 → 합계 = 소계 + 부가세. 합계가 한도를 넘으면 '필수'가 아닌 항목의 체크를 빼세요.</p>`
+        : '';
+      el.innerHTML = `${help}
         <div class="sheet-wrap"><table class="sheet">
           <thead><tr><th>항목</th><th>단가(원)</th><th>수량</th><th>금액(원)</th><th>포함</th></tr></thead>
           <tbody>${rows}
@@ -285,7 +289,7 @@
             </div>
           </div>
         </div>
-        <details class="rules"><summary>사내 전결 규정 보기</summary>
+        <details class="rules" ${W.level().help ? 'open' : ''}><summary>사내 전결 규정 보기</summary>
           <ul>
             <li>100만 원 미만: 팀장 {{전결}}</li>
             <li>100만 원 이상 500만 원 미만: 팀장 → 부장</li>

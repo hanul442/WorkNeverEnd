@@ -274,9 +274,14 @@
 
   // 오늘 무작위로 들어올 업무 종류와 비중
   const WEIGHTS = { schedule: 2, budget: 2, report: 2, reorder: 2, mail: 2, review: 2, match: 2, expense: 1 };
+  const HARD = ['budget', 'report', 'expense'];
   G.random = () => {
     const bag = [];
-    Object.entries(WEIGHTS).forEach(([k, n]) => { for (let i = 0; i < n; i++) bag.push(k); });
+    const early = W.s && W.s.day < W.level().hardFrom;
+    Object.entries(WEIGHTS).forEach(([k, n]) => {
+      if (early && HARD.includes(k)) return;
+      for (let i = 0; i < n; i++) bag.push(k);
+    });
     return G[W.pick(bag)]();
   };
 })();

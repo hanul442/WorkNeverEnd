@@ -7,8 +7,8 @@
   let timer = null;
 
   // ---------- 새 게임 / 이어하기 ----------
-  function newGame(name, job) {
-    W.s = { name, job, day: 1, stats: { stamina: 80, mental: 70, rep: 50, perf: 0, money: 300000 }, glossary: [], hangover: false, seq: 0 };
+  function newGame(name, job, level) {
+    W.s = { name, job, level, day: 1, stats: { stamina: 80, mental: 70, rep: 50, perf: 0, money: 300000 }, glossary: [], hangover: false, seq: 0 };
     startDay();
   }
 
@@ -72,15 +72,17 @@
   function scheduleDay() {
     const s = W.s;
     const q = s.queue;
-    for (let i = 0; i < 3; i++) W.addTask(W.gen.random(), true);
-    // 업무 요청: 30~50분마다
-    for (let t = C.DAY_START + 25 + W.rand(15); t < 17 * 60; t += 30 + W.rand(20)) {
+    const L = W.level();
+    for (let i = 0; i < L.initial; i++) W.addTask(W.gen.random(), true);
+    // 업무 요청 간격: 난이도별로 다르고, 날이 갈수록 하루 5분씩 짧아진다 (최소 30분)
+    const gapMin = Math.max(30, L.gap[0] - (s.day - 1) * 5);
+    for (let t = C.DAY_START + 25 + W.rand(15); t < 17 * 60; t += gapMin + W.rand(L.gap[1])) {
       if (t >= C.LUNCH_AT && t < C.LUNCH_AT + 60) continue;
       q.push({ at: t, kind: 'task' });
     }
-    W.shuffle(window.CHATS).slice(0, 5).forEach((c, i) => q.push({ at: C.DAY_START + 15 + i * 85 + W.rand(40), kind: 'chat', data: c }));
+    W.shuffle(window.CHATS).slice(0, L.chats).forEach((c, i) => q.push({ at: C.DAY_START + 15 + i * 85 + W.rand(40), kind: 'chat', data: c }));
     W.shuffle(window.CHATTER).slice(0, 3).forEach((c, i) => q.push({ at: C.DAY_START + 5 + i * 150 + W.rand(60), kind: 'chatter', data: c }));
-    W.shuffle(window.WEIRD_TASKS).slice(0, 1 + W.rand(2)).forEach((w) => q.push({ at: C.DAY_START + 90 + W.rand(360), kind: 'weird', data: w }));
+    W.shuffle(window.WEIRD_TASKS).slice(0, L.weird[0] + W.rand(L.weird[1] + 1)).forEach((w) => q.push({ at: C.DAY_START + 90 + W.rand(360), kind: 'weird', data: w }));
     q.sort((a, b) => a.at - b.at);
   }
 
@@ -93,7 +95,7 @@
       title: tpl.title,
       from: fromOverride || tpl.from,
       minutes: tpl.minutes || 10,
-      due: s.minute + (tpl.deadline || 180),
+      due: s.minute + Math.round((tpl.deadline || 180) * W.level().deadline),
       brief: tpl.brief || '',
       data: tpl.data || tpl,
       weird: !!tpl.weird,
@@ -122,13 +124,14 @@
     s.tasks = s.tasks.filter((t) => t !== task);
     const effects = { stamina: -3 };
     let verdict;
-    if (q >= 0.9) {
+    const L = W.level();
+    if (q >= L.pass) {
       effects.perf = 8;
       effects.rep = 2;
       effects.mental = 1;
       verdict = '통과';
       s.done++;
-    } else if (q >= 0.6) {
+    } else if (q >= L.ok) {
       effects.perf = 4;
       effects.mental = -3;
       verdict = '수정 후 통과';
@@ -147,11 +150,11 @@
     s.lastResult = { task, verdict, note, effects };
 
     // 예산표가 통과하면 바로 품의를 올리라는 요청이 이어진다
-    if (task.type === 'budget' && task.result && task.result.ok && q >= 0.6) {
+    if (task.type === 'budget' && task.result && task.result.ok && q >= L.ok) {
       setTimeout(() => W.addTask(W.gen.approval(task.data.purpose, task.result.total), true), 900);
     }
     // 문서 구성을 틀리면 다시 고치라는 요청이 온다
-    if (task.type === 'reorder' && q < 0.9) {
+    if (task.type === 'reorder' && q < 1) {
       setTimeout(() => W.msg.post(task.from, task.from, task.data.feedback), 600);
     }
     renderMain();
@@ -608,13 +611,14 @@
       $('#player-name').value = saved.name;
     }
     W.$$('.job:not([disabled])').forEach((j) => j.addEventListener('click', () => {
-      W.$$('.job').forEach((x) => x.classList.toggle('selected', x === j));
+      const group = j.classList.contains('level') ? '.job.level' : '.job:not(.level)';
+      W.$$(group).forEach((x) => x.classList.toggle('selected', x === j));
     }));
     $('#start-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const name = $('#player-name').value.trim() || '김신입';
       W.clearSave();
-      newGame(name, $('.job.selected').dataset.job);
+      newGame(name, $('.job.selected:not(.level)').dataset.job, $('.job.level.selected').dataset.level);
     });
 
     document.addEventListener('click', (e) => {
