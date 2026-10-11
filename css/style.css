@@ -12,11 +12,11 @@
   --bad: #c0392b;
   --radius: 8px;
   font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #15181d;
     --surface: #1e2229;
     --surface-2: #252a32;
@@ -28,7 +28,23 @@
     --good: #4cc584;
     --warn: #e6a23c;
     --bad: #ef6b5b;
+    color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #15181d;
+  --surface: #1e2229;
+  --surface-2: #252a32;
+  --border: #353b45;
+  --text: #e8eaee;
+  --text-2: #9aa3af;
+  --accent: #7f9ef0;
+  --accent-soft: #263150;
+  --good: #4cc584;
+  --warn: #e6a23c;
+  --bad: #ef6b5b;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -121,7 +137,7 @@ h1, h2, h3 { margin: 0; }
 
 .term { border: none; background: none; padding: 0; color: var(--accent); text-decoration: underline dotted; text-underline-offset: 3px; font-weight: 600; }
 
-.actions { display: flex; gap: 8px; padding: 10px 16px; background: var(--surface); border-top: 1px solid var(--border); }
+.actions { display: flex; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--surface); border-top: 1px solid var(--border); }
 .actions button { flex: 1; padding: 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface-2); }
 .actions small { color: var(--text-2); }
 
