@@ -50,7 +50,12 @@ window.WNE = (() => {
 
   W.esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  W.meName = () => (W.s && W.s.name ? W.s.name : '김신입') + ' 씨';
+  // 사원은 "OO 씨", 주임부터는 "OO 대리님"처럼 부른다
+  W.meName = () => {
+    const name = W.s && W.s.name ? W.s.name : '김신입';
+    const rank = W.s && W.s.rank ? window.RANKS[W.s.rank].name : '';
+    return rank ? `${name} ${rank}님` : name + ' 씨';
+  };
 
   // {me} 를 호칭으로, {{용어}} 를 눌러 볼 수 있는 버튼으로 바꾼다
   W.rich = (text) => W.esc(String(text).replace(/\{me\}/g, W.meName())).replace(/\{\{(.+?)\}\}/g, (_, t) =>
@@ -127,7 +132,8 @@ window.WNE = (() => {
   W.save = () => {
     try {
       const s = W.s;
-      localStorage.setItem(C.SAVE_KEY, JSON.stringify({ name: s.name, job: s.job, day: s.day, stats: s.stats, glossary: s.glossary, hangover: s.hangover }));
+      const keep = ['name', 'job', 'level', 'day', 'stats', 'glossary', 'hangover', 'rank', 'points', 'leave', 'week', 'reviews', 'vacation', 'back'];
+      localStorage.setItem(C.SAVE_KEY, JSON.stringify(Object.fromEntries(keep.map((k) => [k, s[k]]))));
     } catch (e) { /* 저장이 막힌 브라우저에서는 넘어간다 */ }
   };
   W.clearSave = () => {

@@ -106,6 +106,7 @@ textarea.input { resize: vertical; }
 .hint.help { background: var(--accent-soft); color: var(--text); border-radius: var(--radius); padding: 8px 10px; margin: 0 0 10px; }
 .muted { color: var(--text-2); }
 .empty { color: var(--text-2); }
+.empty.pad { padding: 12px 14px; margin: 0; }
 .error { color: var(--bad); font-weight: 500; }
 .eyebrow { font-size: 12px; color: var(--text-2); letter-spacing: 0.02em; margin: 0 0 2px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
@@ -379,6 +380,45 @@ legend { font-weight: 700; margin-bottom: 6px; padding: 0; }
 .summary td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ---------- 좁은 화면 ---------- */
+
+/* 인사·근태 */
+.t-handover { color: var(--av3); }
+.bar.wide { display: block; height: 8px; border-radius: 4px; background: var(--surface-3); overflow: hidden; margin: 6px 0; }
+.bar.wide .fill { display: block; height: 100%; background: var(--accent); }
+.ladder { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.ladder li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--radius); }
+.ladder li > span:first-child { min-width: 52px; font-weight: 600; }
+.ladder li.now { background: var(--accent-soft); }
+.ladder li.past { color: var(--text-2); }
+.ladder li.locked { color: var(--text-2); opacity: 0.7; }
+.grade { font-size: 56px; font-weight: 700; line-height: 1; margin: 8px 0; }
+.grade-S { color: var(--accent); } .grade-A { color: var(--good); } .grade-B { color: var(--text); }
+.grade-C { color: var(--warn); } .grade-D { color: var(--bad); }
+.grade-chip { font-weight: 700; }
+
+/* 휴가 신청서 */
+.leave-form { display: flex; flex-direction: column; gap: 8px; }
+.leave-form .label { font-weight: 600; font-size: 13px; margin-top: 6px; }
+.seg { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.seg label { display: flex; gap: 4px; align-items: center; }
+.dest-list { display: flex; flex-direction: column; gap: 6px; }
+.dest { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
+.dest:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; }
+
+/* 휴가 */
+.vac-hero h2 { margin: 2px 0 6px; font-size: 24px; }
+.vac-hero { border-left: 4px solid var(--good); }
+.vac-hero.dest-domestic { border-left-color: var(--accent); }
+.vac-hero.dest-abroad { border-left-color: var(--av5); }
+.vac-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.vac-log li { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.vac-log li:last-child { border-bottom: 0; }
+.vac-log .time { min-width: 72px; color: var(--text-2); font-size: 12.5px; }
+.vac-log li.contact span:last-child { color: var(--warn); }
+.vac-msg { display: flex; gap: 10px; align-items: flex-start; padding: 10px; background: var(--surface-2); border-radius: var(--radius); margin: 8px 0; }
+.vac-msg p { margin: 4px 0 0; }
+
 @media (max-width: 1100px) {
   .gw-body { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; }
   .sidebar { display: none; }

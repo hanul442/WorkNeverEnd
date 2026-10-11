@@ -108,7 +108,7 @@
 
   function listView() {
     const rooms = Object.values(W.s.rooms).sort((a, b) => b.last - a.last);
-    if (!rooms.length) return '<div class="msg-head"><h2>메신저</h2></div><p class="empty">아직 조용하다. 불길하다.</p>';
+    if (!rooms.length) return '<div class="msg-head"><h2>메신저</h2></div><p class="empty pad">아직 조용하다. 불길하다.</p>';
     return `<div class="msg-head"><h2>메신저</h2></div><ul class="room-list">${rooms.map((r) => {
       const last = r.messages[r.messages.length - 1];
       const isTeam = !!window.ROOMS_EXTRA[r.id];

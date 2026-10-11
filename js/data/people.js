@@ -11,7 +11,9 @@ window.PEOPLE = {
   yoon: { name: '윤채원', rank: '매니저', dept: '고객센터', color: 8 },
   oh: { name: '오현주', rank: '대리', dept: '총무팀', color: 2 },
   song: { name: '송도윤', rank: '과장', dept: '재무팀', color: 5 },
-  partner: { name: '김민지', rank: '팀장', dept: 'A사 마케팅팀', color: 8, external: true }
+  partner: { name: '김민지', rank: '팀장', dept: 'A사 마케팅팀', color: 8, external: true },
+  mom: { name: '엄마', rank: '', dept: '가족', color: 3, external: true },
+  friend: { name: '민수', rank: '', dept: '대학 동기', color: 6, external: true }
 };
 
 // 메신저 단체방

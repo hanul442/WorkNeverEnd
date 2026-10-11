@@ -9,15 +9,18 @@
   // ---------- 새 게임 / 이어하기 ----------
   function newGame(name, job, level) {
     W.s = { name, job, level, day: 1, stats: { stamina: 80, mental: 70, rep: 50, perf: 0, money: 300000 }, glossary: [], hangover: false, seq: 0 };
+    W.initCareer();
     startDay();
   }
 
   function continueGame(saved) {
     W.s = { ...saved, seq: 0 };
-    startDay();
+    W.initCareer();
+    W.beginDay();
   }
 
-  function startDay() {
+  // 하루치 상태 비우기 (출근일, 휴가일 공통)
+  W.resetDay = () => {
     const s = W.s;
     Object.assign(s, {
       minute: C.DAY_START,
@@ -41,6 +44,11 @@
       done: 0,
       missed: 0
     });
+  };
+
+  function startDay() {
+    const s = W.s;
+    W.resetDay();
     s.calendar = W.gen.calendar();
 
     const morning = [];
@@ -57,6 +65,8 @@
     s.dayStartStats = { ...s.stats };
 
     scheduleDay();
+    const back = W.welcomeBack();
+    if (back) morning.push(...back);
     $('#start-screen').hidden = true;
     $('#game-screen').hidden = false;
     renderAll();
@@ -73,9 +83,10 @@
     const s = W.s;
     const q = s.queue;
     const L = W.level();
-    for (let i = 0; i < L.initial; i++) W.addTask(W.gen.random(), true);
-    // 업무 요청 간격: 난이도별로 다르고, 날이 갈수록 하루 5분씩 짧아진다 (최소 30분)
-    const gapMin = Math.max(30, L.gap[0] - (s.day - 1) * 5);
+    // 직급이 오를수록 출근하자마자 쌓인 업무와 요청 빈도가 늘어난다
+    for (let i = 0; i < L.initial + Math.floor(s.rank / 2); i++) W.addTask(W.gen.random(), true);
+    // 업무 요청 간격: 난이도별로 다르고, 날이 갈수록 하루 5분씩, 직급 하나에 5분씩 짧아진다 (최소 30분)
+    const gapMin = Math.max(30, L.gap[0] - (s.day - 1) * 5 - s.rank * 5);
     for (let t = C.DAY_START + 25 + W.rand(15); t < 17 * 60; t += gapMin + W.rand(L.gap[1])) {
       if (t >= C.LUNCH_AT && t < C.LUNCH_AT + 60) continue;
       q.push({ at: t, kind: 'task' });
@@ -144,6 +155,7 @@
       s.missed++;
     }
     if (task.weird) effects.mental = (effects.mental || 0) - 4;
+    if (task.type === 'handover' && s.vacation) s.vacation.handoverQ = q;
     W.applyEffects(effects);
     W.learnTerms(task.title + ' ' + task.brief);
     s.docs.unshift({ title: task.title, type: task.type, verdict, at: s.minute });
@@ -232,6 +244,7 @@
     while (s.queue.length && s.queue[0].at <= s.minute) {
       const ev = s.queue.shift();
       if (ev.kind === 'approval') { resolveApproval(ev.data); continue; }
+      if (ev.kind === 'leave') { W.resolveLeave(ev.data); continue; }
       if (s.phase !== 'work') continue;
       if (ev.kind === 'task') W.addTask(W.gen.random(), true);
       if (ev.kind === 'chat') W.msg.ask(ev.data);
@@ -345,6 +358,9 @@
     const s = W.s;
     W.pause();
     s.phase = 'evening';
+    // 아직 안 나온 휴가 결재는 퇴근 전에 결과가 나온다
+    s.queue.filter((q) => q.kind === 'leave').forEach((q) => W.resolveLeave(q.data));
+    s.queue = s.queue.filter((q) => q.kind !== 'leave');
     if (s.tasks.length) {
       s.missed += s.tasks.length;
       W.applyEffects({ perf: -4 * s.tasks.length });
@@ -382,6 +398,9 @@
     const s = W.s;
     if (s.over) return;
     stopTimer();
+    s.week.workdays++;
+    s.week.done += s.done;
+    s.week.missed += s.missed;
     const rows = Object.keys(W.STAT_INFO).map((k) => {
       const diff = Math.round(s.stats[k] - s.dayStartStats[k]);
       const show = k === 'money' ? W.fmtMoney(s.stats[k]) : Math.round(s.stats[k]);
@@ -397,7 +416,7 @@
         <tr><td>상신한 결재</td><td>${s.approvals.length}건</td></tr>
         ${rows}
       </table>${terms}`, [
-      { label: '다음 날 출근', onClick: () => { W.closeModal(); s.day++; W.save(); startDay(); } }
+      { label: '다음 날로', onClick: () => { W.closeModal(); W.nextDay(); } }
     ]);
     W.save();
   }
@@ -419,8 +438,9 @@
   // ---------- 화면 ----------
   const NAV = [
     ['home', '홈'], ['inbox', '업무함'], ['messenger', '메신저'], ['calendar', '캘린더'],
-    ['approvals', '전자결재'], ['docs', '문서함'], ['glossary', '용어집']
+    ['approvals', '전자결재'], ['docs', '문서함'], ['hr', '인사·근태'], ['glossary', '용어집']
   ];
+  const VACATION_NAV = [['vacation', '휴가'], ['messenger', '메신저'], ['hr', '인사·근태'], ['glossary', '용어집']];
 
   W.messengerVisible = () => window.innerWidth > 1100 || W.s.view === 'messenger';
 
@@ -442,11 +462,11 @@
   // 매 분 바뀌는 부분: 시계, 수치, 배지
   function renderChrome() {
     const s = W.s;
-    $('#clock').textContent = W.fmtTime(s.minute);
+    $('#clock').textContent = s.phase === 'vacation' ? W.vacationClock() : W.fmtTime(s.minute);
     $('#day-label').textContent = `${s.day}일차 ${window.WEEKDAYS[(s.day - 1) % 5]}요일`;
-    $('#phase-label').textContent = s.phase === 'overtime' ? '야근 중' : '';
-    $('#phase-label').hidden = s.phase !== 'overtime';
-    W.setHtml($('#nav'), NAV.map(([k, label]) => {
+    $('#phase-label').textContent = s.phase === 'overtime' ? '야근 중' : s.phase === 'vacation' ? '휴가 중' : '';
+    $('#phase-label').hidden = s.phase !== 'overtime' && s.phase !== 'vacation';
+    W.setHtml($('#nav'), (s.phase === 'vacation' ? VACATION_NAV : NAV).map(([k, label]) => {
       const count = k === 'inbox' ? s.tasks.length : 0;
       return `<button type="button" class="nav-item ${s.view === k || (k === 'inbox' && s.view === 'task') ? 'active' : ''} ${k === 'messenger' ? 'mobile-only' : ''}" data-go="${k}">
         ${label}${count ? ` <span class="badge">${count}</span>` : ''}${k === 'messenger' ? ' <span class="badge" data-badge="messenger" hidden></span>' : ''}</button>`;
@@ -479,13 +499,14 @@
   function profileCard() {
     const s = W.s;
     return `<div class="card profile">
-      <div class="profile-top">${W.avatar('me', 'lg')}<div><strong>${esc(s.name)}</strong><span>${esc(s.job)}팀 · 사원</span></div></div>
+      <div class="profile-top">${W.avatar('me', 'lg')}<div><strong>${esc(s.name)}</strong><span>${esc(s.job)}팀 · ${esc(W.rankName())}</span></div></div>
       <div class="stats" data-stats></div>
-      <div class="break-row">
+      ${s.phase === 'vacation' ? '' : `<div class="break-row">
         <button type="button" class="btn" data-break="coffee">커피타임 <small>15분</small></button>
         <button type="button" class="btn" data-break="smoke">담배타임 <small>10분</small></button>
-      </div>
+      </div>`}
       <p class="hint">오늘 처리 ${s.done}건 · 용어 <span data-glossary-count>${s.glossary.length}</span>개</p>
+      <p class="hint"><button type="button" class="link-btn" data-go="hr">연차 ${s.leave}일 · 승진 포인트 ${s.points}${W.nextRank() ? '/' + W.nextRank().need : ''}</button></p>
     </div>`;
   }
 
@@ -565,6 +586,10 @@
             ? `<div class="g-item"><span class="eyebrow">${esc(info.field)}</span><strong>${esc(t)}</strong><p>${esc(info.meaning)}</p><p class="example">예: "${esc(info.example)}"</p></div>`
             : `<div class="g-item locked"><span class="eyebrow">${esc(info.field)}</span><strong>???</strong><p>아직 만나지 못한 용어</p></div>`;
         }).join('')}</div></section>`;
+    } else if (v === 'hr') {
+      W.renderHR(main);
+    } else if (v === 'vacation') {
+      W.renderVacation(main);
     } else if (v === 'messenger') {
       main.innerHTML = '';
     }
@@ -606,7 +631,7 @@
     if (saved) {
       const b = $('#btn-continue');
       b.hidden = false;
-      b.textContent = `이어서 출근하기 (${saved.name}, ${saved.day}일차)`;
+      b.textContent = `이어서 하기 (${saved.name}, ${saved.day}일차)`;
       b.addEventListener('click', () => continueGame(saved));
       $('#player-name').value = saved.name;
     }
@@ -635,6 +660,7 @@
       const b = e.target.closest('[data-break]');
       if (b) return takeBreak(b.dataset.break);
       if (e.target.closest('[data-leave]')) return leaveOffice();
+      if (e.target.closest('[data-leave-form]')) return W.openLeaveForm();
     });
 
     // 업무 앱 입력값은 task.ui 에 저장
@@ -660,5 +686,6 @@
     window.addEventListener('resize', () => { if (W.s) W.renderMessenger(); });
   }
 
+  Object.assign(W, { startDay, setView, renderAll, renderChrome, renderMain, stopTimer, profileCard });
   bind();
 })();
