@@ -53,29 +53,76 @@
     if (opt.minutes) W.advance(opt.minutes);
   };
 
+  // AI 응답을 기다리는 방 (저장하지 않는다)
+  const thinking = new Set();
+  M.thinking = (roomId) => thinking.has(roomId);
+  const aiRoom = (roomId) => window.AI.enabled() && window.PEOPLE[roomId] && roomId !== 'me' && !window.ROOMS_EXTRA[roomId];
+
+  // 답이 필요한 메시지에 직접 쓴 답. AI가 가장 가까운 선택지를 골라 이야기는 그대로 이어진다.
   M.answerFree = async (roomId, text) => {
     const room = M.room(roomId);
     const chat = room.pending;
-    if (!chat || !text.trim()) return;
+    text = String(text || '').trim();
+    if (!chat || !text || thinking.has(roomId)) return;
+    const ta = W.$('#free-' + roomId);
+    if (ta) ta.value = '';
     room.pending = null;
     M.post(roomId, 'me', text);
-    room.scoring = true;
+    thinking.add(roomId);
+    W.renderMessenger();
+    let r;
+    try {
+      r = await window.AI.answer(chat, text);
+    } catch (e) {
+      thinking.delete(roomId);
+      room.pending = chat;
+      W.toast((e && e.message) || 'AI 응답을 받지 못했어요. 선택지로 답해 주세요.');
+      W.renderMessenger();
+      return;
+    }
+    thinking.delete(roomId);
+    const opt = chat.options[r.pick];
+    W.learnTerms(chat.text);
+    W.applyEffects(opt.effects);
+    if (r.bonus) W.applyEffects({ rep: r.bonus });
+    W.afterAnswer(chat, opt);
+    if (opt.accept && chat.weird) W.addTask({ ...chat.weird.task, weird: true }, false);
+    M.post(roomId, chat.from, r.reply || opt.reply || '네.');
+    if (!chat.story) M.post(roomId, 'system', '', { kind: 'score', score: r });
+    if (opt.spawn) W.addTask(W.gen[opt.spawn](), true, chat.from);
+    if (opt.minutes) W.advance(opt.minutes);
+  };
+
+  // 자유 대화: 아무 말이나 걸면 상대가 성격, 호감도, 기억대로 답한다
+  M.say = async (roomId, text) => {
+    text = String(text || '').trim();
+    if (!text || thinking.has(roomId)) return;
+    if (!window.PEOPLE[roomId].external && !W.canTalk()) return W.toast('지금은 말 걸 수 없어요.');
+    const ta = W.$('#free-' + roomId);
+    if (ta) ta.value = '';
+    M.post(roomId, 'me', text);
+    thinking.add(roomId);
     W.renderMessenger();
     try {
-      const r = await window.AI.evaluate({ from: W.fullName(chat.from), scene: chat.scene, message: W.plain(chat.text), answer: text });
-      room.scoring = false;
-      W.learnTerms(chat.text);
-      W.applyEffects(r.effects);
-      M.post(roomId, chat.from, r.reply || '네.');
-      M.post(roomId, 'system', '', { kind: 'score', score: r });
-      const opt = chat.options.find((o) => o.spawn);
-      if (opt) W.addTask(W.gen[opt.spawn](), true, chat.from);
+      const r = await window.AI.chat(roomId, text);
+      thinking.delete(roomId);
+      M.post(roomId, roomId, r.reply);
+      // 말로 올릴 수 있는 호감도는 하루 한 사람당 8까지
+      const key = `${roomId}:ai`;
+      const day = W.s.talked[key] && W.s.talked[key].day === W.s.day ? W.s.talked[key] : { day: W.s.day, up: 0 };
+      if (r.rel > 0) { r.rel = Math.min(r.rel, 8 - day.up); day.up += r.rel; }
+      W.s.talked[key] = day;
+      if (r.rel) W.addRel(roomId, r.rel);
+      if (r.mental) W.applyEffects({ mental: r.mental });
+      if (r.karma) W.karma(r.karma, roomId, '', W.person(roomId).name);
+      if (r.rel >= 3) W.toast(`${W.person(roomId).name}님 호감도 +${r.rel}`);
+      else if (r.rel <= -3) W.toast(`${W.person(roomId).name}님 호감도 −${-r.rel}`);
+      W.advance(3);
     } catch (e) {
-      room.scoring = false;
-      room.pending = chat;
-      W.toast('AI 채점에 실패했어요. 빠른 답장으로 골라 주세요.');
-      W.renderMessenger();
+      thinking.delete(roomId);
+      W.toast((e && e.message) || 'AI 응답을 받지 못했어요.');
     }
+    W.renderMessenger();
   };
 
   M.weird = (w) => {
@@ -98,7 +145,12 @@
     const unreadTotal = Object.values(W.s.rooms).reduce((a, r) => a + r.unread, 0);
     W.$$('[data-badge="messenger"]').forEach((b) => { b.hidden = unreadTotal === 0; b.textContent = unreadTotal; });
     if (W.s.openRoom) {
+      // 다시 그려도 쓰던 글은 남긴다
+      const draft = W.$('.free textarea', el);
+      const keep = draft && { id: draft.id, value: draft.value, focus: document.activeElement === draft };
       if (W.setHtml(el, roomView(M.room(W.s.openRoom)))) {
+        const again = keep && W.$('#' + keep.id, el);
+        if (again && !again.value) { again.value = keep.value; if (keep.focus) again.focus(); }
         const sc = W.$('.msg-scroll', el);
         if (sc) sc.scrollTop = sc.scrollHeight;
       }
@@ -155,11 +207,16 @@
           <div class="msg-line">${body}<span class="msg-time">${W.fmtTime(m.at)}</span></div></div></div>`;
     }).join('');
     const pending = room.pending;
-    const quick = pending
-      ? `<div class="quick">${pending.options.map((o, i) => `<button type="button" class="quick-btn" data-answer="${room.id}" data-i="${i}">${W.rich(o.label)}</button>`).join('')}</div>
-        ${window.AI.enabled() && pending.scene ? `<div class="free"><textarea class="input" rows="2" id="free-${room.id}" placeholder="직접 답장 쓰기"></textarea>
-          <button type="button" class="btn" data-free="${room.id}">보내고 AI 채점받기</button></div>` : ''}`
-      : room.scoring ? '<p class="hint quick">AI가 채점 중...</p>' : (W.talkOptions(room.id) || '<p class="hint quick">답장할 메시지가 없어요.</p>');
+    const ai = aiRoom(room.id);
+    const box = (attr, ph, btn) => `<div class="free"><textarea class="input" rows="2" id="free-${room.id}" maxlength="300" placeholder="${ph}"></textarea>
+      <button type="button" class="btn" ${attr}="${room.id}">${btn}</button></div>`;
+    const quick = thinking.has(room.id)
+      ? `<p class="hint quick typing">${esc(p.name)}님이 입력 중...</p>`
+      : pending
+        ? `<div class="quick">${pending.options.map((o, i) => `<button type="button" class="quick-btn" data-answer="${room.id}" data-i="${i}">${W.rich(o.label)}</button>`).join('')}</div>
+          ${ai ? box('data-free', '또는 직접 답장 쓰기', pending.story ? '보내기' : '보내고 AI 채점받기') : ''}`
+        : (W.talkOptions(room.id) || (ai ? '' : '<p class="hint quick">답장할 메시지가 없어요.</p>'))
+          + (ai && (p.external || W.canTalk()) ? box('data-say', `${p.name}님에게 하고 싶은 말을 자유롭게 써 보세요`, '보내기') : '');
     return `<div class="msg-head room-head">
         <button type="button" class="icon-btn" data-room-back aria-label="대화방 목록으로">‹</button>
         ${isTeam ? '<span class="avatar sm c1 team" aria-hidden="true">팀</span>' : W.avatar(room.id, 'sm')}
@@ -170,6 +227,7 @@
   }
 
   M.bind = () => {
+    M.bindKeys();
     const el = W.$('#messenger');
     el.addEventListener('click', (e) => {
       const r = e.target.closest('[data-room]');
@@ -179,11 +237,24 @@
       if (a) return M.answer(a.dataset.answer, Number(a.dataset.i));
       const f = e.target.closest('[data-free]');
       if (f) return M.answerFree(f.dataset.free, W.$('#free-' + f.dataset.free).value);
+      const sy = e.target.closest('[data-say]');
+      if (sy) return M.say(sy.dataset.say, W.$('#free-' + sy.dataset.say).value);
       if (e.target.closest('[data-dir]')) { W.s.showDir = !W.s.showDir; return W.renderMessenger(); }
       const tk = e.target.closest('[data-talk]');
       if (tk) return W.talk(tk.dataset.who, tk.dataset.talk);
       const o = e.target.closest('[data-open-task]');
       if (o) return W.openTask(o.dataset.openTask);
+    });
+  };
+
+  // 엔터로 보내기 (Shift+엔터는 줄바꿈)
+  M.bindKeys = () => {
+    W.$('#messenger').addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.shiftKey || e.isComposing || !e.target.id || !e.target.id.startsWith('free-')) return;
+      e.preventDefault();
+      const id = e.target.id.slice(5);
+      if (M.room(id).pending) M.answerFree(id, e.target.value);
+      else M.say(id, e.target.value);
     });
   };
 
