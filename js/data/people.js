@@ -16,6 +16,9 @@ window.PEOPLE = {
   deslead: { name: '윤서아', rank: '팀장', dept: '디자인팀', color: 7 },
   salelead: { name: '장민석', rank: '팀장', dept: '영업팀', color: 4 },
   sales: { name: '오세훈', rank: '대리', dept: '영업팀', color: 3 },
+  kimdev: { name: '김지우', rank: '사원', dept: '개발팀', color: 5, peer: true },
+  seoha: { name: '서하늘', rank: '사원', dept: '영업팀', color: 8, peer: true },
+  guard: { name: '경비 아저씨', rank: '', dept: '1층 로비', color: 4, external: true },
   mom: { name: '엄마', rank: '', dept: '가족', color: 3, external: true },
   friend: { name: '민수', rank: '', dept: '대학 동기', color: 6, external: true }
 };

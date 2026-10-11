@@ -11,6 +11,7 @@
     W.s = { name, job, level, day: 1, stats: { stamina: 80, mental: 70, rep: 50, perf: 0, money: 300000 }, glossary: [], hangover: false, seq: 0 };
     W.initCareer();
     W.initRelations();
+    W.initOffice();
     W.applyTeam();
     startDay();
   }
@@ -19,6 +20,7 @@
     W.s = { ...saved, seq: 0 };
     W.initCareer();
     W.initRelations();
+    W.initOffice();
     W.applyTeam();
     W.beginDay();
   }
@@ -98,6 +100,7 @@
     W.shuffle(window.CHATS).slice(0, L.chats).forEach((c, i) => q.push({ at: C.DAY_START + 15 + i * 85 + W.rand(40), kind: 'chat', data: c }));
     W.shuffle(window.CHATTER).slice(0, 3).forEach((c, i) => q.push({ at: C.DAY_START + 5 + i * 150 + W.rand(60), kind: 'chatter', data: c }));
     W.scheduleRelations();
+    W.scheduleOffice();
     W.shuffle(window.WEIRD_TASKS).slice(0, L.weird[0] + W.rand(L.weird[1] + 1)).forEach((w) => q.push({ at: C.DAY_START + 90 + W.rand(360), kind: 'weird', data: w }));
     q.sort((a, b) => a.at - b.at);
   }
@@ -111,7 +114,7 @@
       title: tpl.title,
       from: fromOverride || tpl.from,
       minutes: tpl.minutes || 10,
-      due: s.minute + Math.round((tpl.deadline || 180) * W.level().deadline),
+      due: s.minute + Math.round((tpl.deadline || 180) * W.level().deadline * (W.hasPerk('prep') ? 1.2 : 1)),
       brief: tpl.brief || '',
       data: tpl.data || tpl,
       weird: !!tpl.weird,
@@ -169,6 +172,8 @@
       W.karma('rejected', task.from, task.title);
     }
     if (task.weird) effects.mental = (effects.mental || 0) - 4;
+    const intel = W.perkBonus(task, effects, q >= L.pass);
+    if (intel.length) note = (note ? note + ' ' : '') + `(들은 정보 덕분에 보너스: ${intel.join(', ')})`;
     if (task.type === 'handover' && s.vacation) s.vacation.handoverQ = q;
     W.applyEffects(effects);
     W.learnTerms(task.title + ' ' + task.brief);
@@ -229,6 +234,7 @@
         s.stats.mental = W.clamp(s.stats.mental - 0.1, 0, 100);
       }
       fireQueue();
+      if (s.inScene) { renderChrome(); return; }
       checkDeadlines();
       if (s.phase === 'work' && !s.lunchDone && s.minute >= C.LUNCH_AT) {
         s.lunchDone = true;
@@ -264,6 +270,7 @@
       if (ev.kind === 'cancel') { W.cancelTask(ev.data); continue; }
       if (ev.kind === 'karma') { if (s.phase === 'work') W.karmaReturn(ev.data); continue; }
       if (ev.kind === 'story') { if (s.phase === 'work') W.startStory(ev.data.id); continue; }
+      if (W.fireOffice(ev)) { if (s.inScene) return; continue; }
       if (s.phase !== 'work') continue;
       if (ev.kind === 'task') W.addTask(W.gen.random(), true);
       if (ev.kind === 'chat') W.msg.ask({ ...ev.data, from: W.teamPerson(ev.data.from) });
@@ -303,7 +310,7 @@
     W.openModal(`<p class="eyebrow">${W.fmtTime(s.minute)} 회의 · ${m.dur * 60}분</p><h3>${W.rich(m.title)}</h3>
       <p class="hint">참석: ${m.people.map((p) => esc(W.fullName(p))).join(', ')}</p><p>${esc(quiz.q)}</p>`,
     [
-      ...opts.map((o) => ({ label: o.label, onClick: () => {
+      ...opts.map((o) => ({ label: o.label + (o.correct && W.hasPerk('meetingTip') ? '  💡 들은 정보' : ''), onClick: () => {
         W.closeModal();
         W.applyEffects(o.correct ? { rep: 5, perf: 3 } : { rep: -4, mental: -3 });
         if (o.correct) W.karma('meeting', m.people.find((p) => p !== 'me') || W.lead());
@@ -330,34 +337,30 @@
     s.breaks++;
     const coffee = kind === 'coffee';
     const effects = coffee ? { mental: 8, money: -4500 } : { mental: 10, stamina: -2 };
-    let msg = coffee ? '아이스 아메리카노 한 잔. 살 것 같다.' : '옥상에서 한숨 돌렸다.';
-    if (s.breaks > C.BREAK_LIMIT) {
+    if (s.breaks > C.BREAK_LIMIT && !W.hasPerk('bossAway')) {
       W.karma('slacking', W.lead());
       effects.rep = -4;
-      msg += ' 그런데 팀장님이 "또 나가요?"라고 했다.';
+      W.toast('팀장님: "또 나가요?" 평판 −4');
     }
     W.applyEffects(effects);
-    if (Math.random() < 0.4) msg += ' 들은 소문: "' + W.pick(window.RUMORS) + '"';
-    W.toast(msg);
-    W.advance(coffee ? 15 : 10);
+    W.breakScene(kind, () => W.advance(coffee ? 15 : 10));
   }
 
   // ---------- 점심 ----------
   function lunch() {
     W.pause();
-    W.openModal('<p class="eyebrow">12:00</p><h3>점심시간</h3><p>뭐 먹지?</p>', window.LUNCH.map((l) => ({
+    W.openModal('<p class="eyebrow">12:00</p><h3>점심시간</h3><p>누구랑 뭐 먹지?</p>', window.LUNCH.map((l) => ({
       label: l.label,
       onClick: () => {
         const s = W.s;
         W.applyEffects(l.effects);
         W.closeModal();
-        W.toast(l.result);
         const shift = 13 * 60 - s.minute;
         s.tasks.forEach((t) => { t.due += shift + (l.work || 0); });
         s.queue.forEach((q) => { if (q.kind === 'approval') q.at += shift; });
         s.minute = 13 * 60;
         renderAll();
-        W.resume();
+        W.lunchScene(l, () => W.resume());
       }
     })));
   }
@@ -373,7 +376,7 @@
     }
     W.openModal(`<p class="eyebrow">18:00</p><h3>퇴근 시간</h3><p>업무함에 아직 ${left}건 남았다.</p>
       <p class="hint">야근하면 체력과 멘탈이 계속 줄어요. 그냥 퇴근하면 남은 업무 하나당 성과 −4.</p>`, [
-      { label: '야근한다', onClick: () => { W.closeModal(); W.s.phase = 'overtime'; renderAll(); W.toast('야근 시작. 업무함을 비우면 퇴근할 수 있어요.'); W.resume(); } },
+      { label: '야근한다', onClick: () => { W.closeModal(); W.s.phase = 'overtime'; W.scheduleOvertime(); renderAll(); W.toast('야근 시작. 업무함을 비우면 퇴근할 수 있어요.'); W.resume(); } },
       { label: '내일의 내가 하겠지. 퇴근', onClick: () => { W.closeModal(); leaveOffice(); } }
     ]);
   }
@@ -409,7 +412,9 @@
       onClick: () => {
         W.applyEffects(o.effects);
         if (o.hangover) W.s.hangover = true;
-        W.karma(o.effects.rep > 0 ? 'dinner' : 'dinnerskip', W.lead());
+        if (o.effects.rep > 0) W.karma('dinner', W.lead());
+        else if (W.hasPerk('dinnerWarn')) W.applyEffects({ rep: -o.effects.rep }); // 미리 말해 둬서 괜찮다
+        else W.karma('dinnerskip', W.lead());
         W.closeModal();
         summary(o.result);
       }
@@ -536,6 +541,7 @@
       </div>`}
       <p class="hint">오늘 처리 ${s.done}건 · 용어 <span data-glossary-count>${s.glossary.length}</span>개</p>
       <p class="hint"><button type="button" class="link-btn" data-go="hr">연차 ${s.leave}일 · 승진 포인트 ${s.points}${W.nextRank() ? '/' + W.nextRank().need : ''}</button></p>
+      ${W.intelCard ? W.intelCard() : ''}
       <p class="hint"><button type="button" class="link-btn" data-go="hr"><span class="up">덕 ${W.pendingGood().length}</span> · <span class="down">업보 ${W.pendingKarma().length}</span></button></p>
     </div>`;
   }
@@ -652,6 +658,7 @@
       <div class="task-meta">${W.avatar(task.from, 'xs')} ${esc(W.fullName(task.from))} 요청 · 마감 ${dueText(task)} ${typeChip(task.type)}</div>
       ${task.twist ? `<div class="twist" role="status"><span class="chip warn">변경 요청</span> <strong>${esc(W.person(task.from).name)}:</strong> ${W.rich(task.twist)}</div>` : ''}
       ${task.brief ? `<blockquote class="brief">${W.rich(task.brief)}</blockquote>` : ''}
+      ${W.perkHints(task)}
       ${task.context && task.context.length ? `<div class="context"><span class="label">요청 배경</span><ul>${task.context.map((c) => `<li>${W.rich(c)}</li>`).join('')}</ul></div>` : ''}
       <div id="app-body"></div></section>`;
     W.apps[task.type].render(task, $('#app-body'), (q, note) => finishTask(task, q, note));

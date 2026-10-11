@@ -101,10 +101,10 @@ window.NOTICES = [
 
 // 점심 선택지
 window.LUNCH = [
-  { label: '혼밥 (편의점 도시락)', effects: { mental: 8, money: -5000 }, result: '조용히 혼자 먹었다. 평화로웠다.' },
-  { label: '팀 점심 (팀장님이 고른 국밥집)', effects: { rep: 5, mental: -2, money: -10000 }, result: '팀장님 군대 이야기를 세 번째 들었다.' },
-  { label: '동기랑 맛집', effects: { mental: 12, money: -15000 }, result: '맛있었다. 오후를 버틸 힘이 생겼다.' },
-  { label: '점심 거르고 일하기', effects: { stamina: -10, perf: 3 }, result: '배고프지만 마감이 조금 여유로워졌다.', work: 40 }
+  { with: 'alone', label: '혼밥 (편의점 도시락)', effects: { mental: 8, money: -5000 }, result: '조용히 혼자 먹었다. 평화로웠다.' },
+  { with: 'team', label: '팀 점심 (팀장님이 고른 국밥집)', effects: { rep: 5, mental: -2, money: -10000 }, result: '팀장님 군대 이야기를 세 번째 들었다.' },
+  { with: 'peers', label: '동기랑 맛집', effects: { mental: 12, money: -15000 }, result: '맛있었다. 오후를 버틸 힘이 생겼다.' },
+  { with: 'skip', label: '점심 거르고 일하기', effects: { stamina: -10, perf: 3 }, result: '배고프지만 마감이 조금 여유로워졌다.', work: 40 }
 ];
 
 // 퇴근 후 선택지
@@ -124,12 +124,3 @@ window.TEAM_DINNER = {
   ]
 };
 
-// 커피·담배타임에 들을 수 있는 소문
-window.RUMORS = [
-  '옆 팀 과장님이 다음 달에 이직한대.',
-  '이번 분기 인사평가는 평판 비중이 크대.',
-  '최 부장님은 보고서 첫 줄에 결론 없으면 바로 반려한대.',
-  '팀장님은 오후 3시쯤 기분이 제일 좋대.',
-  '야근 많이 한다고 고과 잘 받는 건 아니래.',
-  '재무팀 송 과장님은 결재선 틀리면 무조건 반려래.'
-];

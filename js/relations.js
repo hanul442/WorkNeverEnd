@@ -72,6 +72,7 @@
   // 메신저에서 답을 고른 뒤 불린다: 호감도, 기억, 덕·업보, 다음 노드
   W.afterAnswer = (chat, opt) => {
     const s = W.s;
+    if (chat.group) return W.groupAnswer(chat, opt);
     const id = chat.from;
     const name = W.person(id).name;
     if (opt.rel) W.addRel(id, opt.rel);
@@ -167,7 +168,10 @@
       }
     } else if (key === 'gossip') {
       if (W.rel(id) >= 15) {
-        reply = line(window.TALK.gossipYes) + W.pick(window.RUMORS);
+        const r = W.hearRumor();
+        reply = line(window.TALK.gossipYes) + r.text;
+        const perk = r.perk && W.gainPerk(r.perk);
+        if (perk) setTimeout(() => W.toast(`정보 획득: ${perk.label} (${perk.desc})`), 900);
         W.addRel(id, 1);
       } else {
         reply = line(window.TALK.gossipNo);
