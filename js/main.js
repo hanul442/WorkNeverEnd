@@ -256,6 +256,7 @@
       if (s.inScene) { renderChrome(); return; }
       checkDeadlines();
       W.manageTick();
+      W.msg.tick();
       if (s.phase === 'work' && !s.lunchDone && s.minute >= C.LUNCH_AT) {
         s.lunchDone = true;
         renderChrome();

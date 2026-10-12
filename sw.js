@@ -1,6 +1,6 @@
 // 오프라인에서도 플레이할 수 있게 게임 파일을 저장해 둔다.
 // 온라인이면 항상 새 파일을 먼저 받고(업데이트 바로 반영), 오프라인이면 저장해 둔 파일을 쓴다.
-const CACHE = 'workneverend-v2';
+const CACHE = 'workneverend-v3';
 const FILES = [
   './',
   'index.html',
@@ -19,6 +19,7 @@ const FILES = [
   'js/data/messages.js',
   'js/data/office.js',
   'js/data/manage.js',
+  'js/data/workplus.js',
   'js/data/people.js',
   'js/data/personas.js',
   'js/data/stories.js',
@@ -31,6 +32,7 @@ const FILES = [
   'js/messenger.js',
   'js/office.js',
   'js/manage.js',
+  'js/workplus.js',
   'js/pwa.js',
   'js/relations.js',
   'js/teamwork.js',

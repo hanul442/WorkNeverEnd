@@ -20,6 +20,11 @@
     const room = M.room(roomId);
     room.messages.push({ from, text, at: W.s.minute, ...extra });
     room.last = W.s.seq++;
+    // 나한테 한 말은 답할 때까지 남는다. 읽고 오래 답 안 하면 읽씹이다.
+    if (from === 'me') room.unanswered = null;
+    else if (extra.kind !== 'score' && !extra.noReply && window.PEOPLE[from]) {
+      room.unanswered = { from, text: W.plain(text || extra.title || ''), kind: extra.kind || 'text', soft: !!extra.soft, at: W.s.minute, seenAt: viewing(roomId) ? W.s.minute : null };
+    }
     if (from !== 'me' && extra.kind !== 'score' && !viewing(roomId)) {
       // quiet: 배지만 올리고 알림은 띄우지 않는다 (결과 보고처럼 자주 오는 메시지)
       room.unread++;
@@ -37,6 +42,71 @@
     W.renderMessenger();
   };
 
+  // ---------- 무슨 말이든 답하기 ----------
+  // tone: good(성의 있게, 호감도 +1), plain(무난), rude(무례, 업보)
+  const REPLIES = {
+    request: [['넵! 확인했습니다. 마감 전까지 드릴게요.', 'good'], ['네.', 'plain'], ['이거 꼭 제가 해야 하나요?', 'rude']],
+    thanks: [['별말씀을요! 언제든지요 😊', 'good'], ['네네~', 'plain'], ['네 뭐.', 'rude']],
+    sorry: [['괜찮아요, 그럴 수 있죠. 같이 봐요.', 'good'], ['다음엔 조심해 주세요.', 'plain'], ['하... 네.', 'rude']],
+    complain: [['죄송합니다. 바로 확인하겠습니다.', 'good'], ['아 깜빡했네요.', 'plain'], ['저도 바빴거든요.', 'rude']],
+    question: [['네, 확인해서 바로 말씀드릴게요!', 'good'], ['잘 모르겠어요.', 'plain'], ['그걸 왜 저한테 물어보세요?', 'rude']],
+    casualQ: [['좋아요! 같이 가요 ㅎㅎ', 'good'], ['음 글쎄요~ 아무거나요', 'plain'], ['저 바빠서요.', 'rude']],
+    chat: [['ㅋㅋㅋ 진짜요? 대박', 'good'], ['ㅎㅎ', 'plain'], ['아 네...', 'rude']],
+    group: [['ㅋㅋㅋㅋ 공감이요', 'good'], ['오 그래요?', 'plain'], ['👍', 'plain']],
+    text: [['넵, 알겠습니다! 감사합니다 😊', 'good'], ['네.', 'plain'], ['(이모티콘 하나만 보낸다) 👌', 'plain']]
+  };
+  const FOLLOW = ['ㅎㅎ 고마워요!', '👍', '네~ 부탁해요!', '😊', '역시 믿고 갑니다 ㅎㅎ'];
+  const replyKind = (room) => {
+    const u = room.unanswered;
+    const t = u.text;
+    if (window.ROOMS_EXTRA[room.id]) return 'group';
+    if (u.kind === 'request') return 'request';
+    if (/마감 지났|안 들어왔|왜 |아직 아무도|반려|넘겼죠|어디 있어요/.test(t)) return 'complain';
+    if (/죄송|미안/.test(t)) return 'sorry';
+    if (/감사|고마|고맙/.test(t)) return 'thanks';
+    const casual = (window.PEOPLE[u.from] || {}).peer || /점심|커피|주말|퇴근|술|맛집|ㅋ|ㅎㅎ|헐/.test(t);
+    if (/[?？]/.test(t)) return casual ? 'casualQ' : 'question';
+    return casual ? 'chat' : 'text';
+  };
+  const replyButtons = (room) => {
+    if (!room.unanswered || !W.canTalk()) return '';
+    const opts = REPLIES[replyKind(room)];
+    return `<div class="quick">${opts.map(([label], i) => `<button type="button" class="quick-btn" data-reply="${room.id}" data-i="${i}">${esc(label)}</button>`).join('')}</div>`;
+  };
+  M.reply = (roomId, i) => {
+    const s = W.s;
+    const room = M.room(roomId);
+    const u = room.unanswered;
+    if (!u) return;
+    const [label, tone] = REPLIES[replyKind(room)][i];
+    M.post(roomId, 'me', label);
+    const who = u.from;
+    if (tone === 'good') {
+      // 성의 있는 답은 하루 한 사람당 호감도 +3까지
+      const key = `${who}:reply`;
+      const t = s.talked[key] && s.talked[key].day === s.day ? s.talked[key] : { day: s.day, up: 0 };
+      if (t.up < 3) { W.addRel(who, 1); t.up++; }
+      s.talked[key] = t;
+      if (Math.random() < 0.4) setTimeout(() => M.post(roomId, who, W.pick(FOLLOW), { noReply: true, quiet: true }), 800);
+    }
+    if (tone === 'rude') W.karma('rude', who, '', W.person(who).name);
+    W.advance(1);
+    W.renderMessenger();
+  };
+  // 읽고 90분 넘게 답이 없으면 읽씹 업보 (근무 중, 1:1 대화방만)
+  M.tick = () => {
+    const s = W.s;
+    if (s.phase !== 'work' && s.phase !== 'overtime') return;
+    Object.values(s.rooms).forEach((r) => {
+      const u = r.unanswered;
+      if (!u || u.ghosted || u.soft || r.pending || u.seenAt == null || window.ROOMS_EXTRA[r.id] || u.kind === 'request') return;
+      if (s.minute - u.seenAt < 90) return;
+      u.ghosted = true;
+      W.karma('ghosted', u.from, '', W.person(u.from).name);
+      W.toast(`${W.person(u.from).name}님 메시지를 읽고 답을 안 했다. 읽씹으로 남았다.`);
+    });
+  };
+
   M.answer = (roomId, i) => {
     const room = M.room(roomId);
     const chat = room.pending;
@@ -49,7 +119,7 @@
     W.afterAnswer(chat, opt);
     if (opt.accept && chat.weird) W.addTask({ ...chat.weird.task, weird: true }, false);
     setTimeout(() => {
-      if (opt.reply) M.post(roomId, chat.from, opt.reply);
+      if (opt.reply) M.post(roomId, chat.from, opt.reply, { soft: true });
       if (opt.spawn) W.addTask(W.gen[opt.spawn](), true, chat.from);
     }, 700);
     if (opt.minutes) W.advance(opt.minutes);
@@ -99,7 +169,7 @@
 
   // 자유 대화: 아무 말이나 걸면 상대가 성격, 호감도, 기억대로 답한다
   // 말풍선 여러 개를 사람이 치듯 조금씩 올린다
-  const postBubbles = (roomId, list) => list.forEach((b, i) => setTimeout(() => M.post(roomId, b.from, b.text), i * 900));
+  const postBubbles = (roomId, list) => list.forEach((b, i) => setTimeout(() => M.post(roomId, b.from, b.text, { soft: true }), i * 900));
 
   M.say = async (roomId, text) => {
     text = String(text || '').trim();
@@ -202,6 +272,7 @@
   }
 
   function roomView(room) {
+    if (room.unanswered && room.unanswered.seenAt == null && viewing(room.id)) room.unanswered.seenAt = W.s.minute;
     const isTeam = !!window.ROOMS_EXTRA[room.id];
     const p = W.person(room.id);
     let prevFrom = null;
@@ -233,7 +304,7 @@
       : pending
         ? `<div class="quick">${pending.options.map((o, i) => `<button type="button" class="quick-btn" data-answer="${room.id}" data-i="${i}">${W.rich(o.label)}</button>`).join('')}</div>
           ${ai ? box('data-free', '또는 직접 답장 쓰기', pending.story ? '보내기' : '보내고 AI 채점받기') : ''}`
-        : (W.talkOptions(room.id) || (ai ? '' : '<p class="hint quick">답장할 메시지가 없어요.</p>'))
+        : ((replyButtons(room) + (W.talkOptions(room.id) || '')) || (ai ? '' : '<p class="hint quick">답장할 메시지가 없어요.</p>'))
           + (ai && (p.external || W.canTalk()) ? box('data-say', isTeam ? '단톡방에 하고 싶은 말을 써 보세요' : `${p.name}님에게 하고 싶은 말을 자유롭게 써 보세요`, '보내기') : '');
     return `<div class="msg-head room-head">
         <button type="button" class="icon-btn" data-room-back aria-label="대화방 목록으로">‹</button>
@@ -251,6 +322,8 @@
       const r = e.target.closest('[data-room]');
       if (r) return M.open(r.dataset.room);
       if (e.target.closest('[data-room-back]')) { W.s.openRoom = null; return W.renderMessenger(); }
+      const rp = e.target.closest('[data-reply]');
+      if (rp) return M.reply(rp.dataset.reply, Number(rp.dataset.i));
       const a = e.target.closest('[data-answer]');
       if (a) return M.answer(a.dataset.answer, Number(a.dataset.i));
       const f = e.target.closest('[data-free]');
@@ -280,6 +353,8 @@
     W.s.openRoom = roomId;
     W.s.showDir = false;
     M.room(roomId).unread = 0;
+    const u = M.room(roomId).unanswered;
+    if (u && u.seenAt == null) u.seenAt = W.s.minute;
     W.renderMessenger();
   };
 })();
