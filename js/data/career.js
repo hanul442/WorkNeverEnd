@@ -1,17 +1,17 @@
 // 직급 체계. need: 이 직급으로 올라가는 데 필요한 승진 포인트, pay: 급여일(매주 금요일 뒤)에 들어오는 돈
-// open: false 인 직급은 팀을 맡아 업무를 배당하는 4단계에서 열린다
+// open: true 인 직급은 팀을 맡아 업무를 배당하는 4단계에서 열린다
 window.RANKS = [
   { name: '사원', pay: 2400000, open: true },
   { name: '주임', need: 2, pay: 2700000, open: true },
   { name: '대리', need: 3, pay: 3100000, open: true },
   { name: '과장', need: 4, pay: 3700000, open: true },
-  { name: '차장', need: 5, pay: 4300000, open: false },
-  { name: '부장', need: 5, pay: 5200000, open: false },
-  { name: '이사', need: 6, pay: 7000000, open: false },
-  { name: '상무', need: 6, pay: 8500000, open: false },
-  { name: '전무', need: 7, pay: 10000000, open: false },
-  { name: '부사장', need: 7, pay: 12000000, open: false },
-  { name: '사장', need: 8, pay: 15000000, open: false }
+  { name: '차장', need: 5, pay: 4300000, open: true },
+  { name: '부장', need: 5, pay: 5200000, open: true },
+  { name: '이사', need: 6, pay: 7000000, open: true },
+  { name: '상무', need: 6, pay: 8500000, open: true },
+  { name: '전무', need: 7, pay: 10000000, open: true },
+  { name: '부사장', need: 7, pay: 12000000, open: true },
+  { name: '사장', need: 8, pay: 15000000, open: true }
 ];
 
 // 주간 인사평가 등급. rate: 처리율(처리 ÷ 처리+놓침), rep: 평판 하한, points: 승진 포인트

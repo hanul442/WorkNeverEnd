@@ -21,9 +21,10 @@
     room.messages.push({ from, text, at: W.s.minute, ...extra });
     room.last = W.s.seq++;
     if (from !== 'me' && extra.kind !== 'score' && !viewing(roomId)) {
+      // quiet: 배지만 올리고 알림은 띄우지 않는다 (결과 보고처럼 자주 오는 메시지)
       room.unread++;
       // 단톡방은 나를 부를 때만 알림을 띄운다
-      if (!window.ROOMS_EXTRA[roomId] || extra.ping) W.toast(`${window.ROOMS_EXTRA[roomId] ? '[' + room.name + '] ' : ''}` + `${W.person(from).name}: ${W.plain(text).slice(0, 40)}`);
+      if (!extra.quiet && (!window.ROOMS_EXTRA[roomId] || extra.ping)) W.toast(`${window.ROOMS_EXTRA[roomId] ? '[' + room.name + '] ' : ''}` + `${W.person(from).name}: ${W.plain(text).slice(0, 40)}`);
     }
     W.renderMessenger();
   };

@@ -12,6 +12,7 @@
     W.initCareer();
     W.initRelations();
     W.initOffice();
+    W.initManage();
     W.applyTeam();
     startDay();
   }
@@ -21,6 +22,7 @@
     W.initCareer();
     W.initRelations();
     W.initOffice();
+    W.initManage();
     W.applyTeam();
     W.beginDay();
   }
@@ -47,6 +49,9 @@
       paused: true,
       over: false,
       todayTerms: [],
+      assign: [],
+      working: [],
+      crewOff: [],
       done: 0,
       missed: 0
     });
@@ -99,7 +104,8 @@
     const q = s.queue;
     const L = W.level();
     // 직급이 오를수록 출근하자마자 쌓인 업무와 요청 빈도가 늘어난다
-    for (let i = 0; i < L.initial + Math.floor(s.rank / 2); i++) W.addTask(W.gen.random(), true);
+    W.scheduleManage();
+    for (let i = 0; i < L.initial + Math.floor(s.rank / 2); i++) W.incomingTask();
     // 업무 요청 간격: 난이도별로 다르고, 날이 갈수록 하루 5분씩, 직급 하나에 5분씩 짧아진다 (최소 30분)
     const gapMin = Math.max(30, L.gap[0] - (s.day - 1) * 5 - s.rank * 5);
     for (let t = C.DAY_START + 25 + W.rand(15); t < 17 * 60; t += gapMin + W.rand(L.gap[1])) {
@@ -249,6 +255,7 @@
       fireQueue();
       if (s.inScene) { renderChrome(); return; }
       checkDeadlines();
+      W.manageTick();
       if (s.phase === 'work' && !s.lunchDone && s.minute >= C.LUNCH_AT) {
         s.lunchDone = true;
         renderChrome();
@@ -283,9 +290,10 @@
       if (ev.kind === 'cancel') { W.cancelTask(ev.data); continue; }
       if (ev.kind === 'karma') { if (s.phase === 'work') W.karmaReturn(ev.data); continue; }
       if (ev.kind === 'story') { if (s.phase === 'work') W.startStory(ev.data.id); continue; }
+      if (W.fireManage(ev)) continue;
       if (W.fireOffice(ev)) { if (s.inScene) return; continue; }
       if (s.phase !== 'work') continue;
-      if (ev.kind === 'task') W.addTask(W.gen.random(), true);
+      if (ev.kind === 'task') W.incomingTask();
       if (ev.kind === 'chat') W.msg.ask({ ...ev.data, from: W.teamPerson(ev.data.from) });
       if (ev.kind === 'chatter') W.msg.post('team', W.teamPerson(ev.data.from), ev.data.text);
       if (ev.kind === 'weird') W.msg.weird({ ...ev.data, from: W.teamPerson(ev.data.from) });
@@ -404,6 +412,7 @@
     s.queue.filter((q) => q.kind === 'leave').forEach((q) => W.resolveLeave(q.data));
     s.queue.filter((q) => q.kind === 'transfer').forEach((q) => W.resolveTransfer(q.data));
     s.queue = s.queue.filter((q) => q.kind !== 'leave' && q.kind !== 'transfer');
+    W.manageLeave();
     // 끝내지 못한 일과 답하지 않은 메시지는 휴가 때 돌아온다
     s.tasks.forEach((t) => W.karma('unfinished', t.from, t.title));
     Object.values(s.rooms).forEach((r) => { if (r.pending && window.PEOPLE[r.id]) W.karma('ignored', r.id, '', W.person(r.id).name); });
@@ -515,8 +524,9 @@
     $('#day-label').textContent = `${s.day}일차 ${window.WEEKDAYS[(s.day - 1) % 5]}요일`;
     $('#phase-label').textContent = s.phase === 'overtime' ? '야근 중' : s.phase === 'vacation' ? '휴가 중' : '';
     $('#phase-label').hidden = s.phase !== 'overtime' && s.phase !== 'vacation';
-    W.setHtml($('#nav'), (s.phase === 'vacation' ? VACATION_NAV : NAV).map(([k, label]) => {
-      const count = k === 'inbox' ? s.tasks.length : 0;
+    const nav = s.phase === 'vacation' ? VACATION_NAV : W.isManager() ? [NAV[0], ['manage', '업무 배당'], ...NAV.slice(1)] : NAV;
+    W.setHtml($('#nav'), nav.map(([k, label]) => {
+      const count = k === 'inbox' ? s.tasks.length : k === 'manage' ? s.assign.length : 0;
       return `<button type="button" class="nav-item ${s.view === k || (k === 'inbox' && s.view === 'task') ? 'active' : ''} ${k === 'messenger' ? 'mobile-only' : ''}" data-go="${k}">
         ${label}${count ? ` <span class="badge">${count}</span>` : ''}${k === 'messenger' ? ' <span class="badge" data-badge="messenger" hidden></span>' : ''}</button>`;
     }).join(''));
@@ -601,6 +611,8 @@
         <div class="home-grid">
           <section class="card"><div class="card-head"><h2>오늘 할 일</h2><button type="button" class="link-btn" data-go="inbox">업무함 전체 보기</button></div>
             <div id="home-todo">${todoList()}</div></section>
+          ${W.isManager() ? `<section class="card"><div class="card-head"><h2>배당할 일</h2><button type="button" class="link-btn" data-go="manage">업무 배당</button></div>
+            ${s.assign.length ? `<p><strong>${s.assign.length}건</strong>이 주인을 기다린다. 진행 중 ${s.working.filter((w) => !w.closed).length}건.</p><button type="button" class="btn primary" data-go="manage">배당하러 가기</button>` : '<p class="empty">배당할 일이 없다.</p>'}</section>` : ''}
           <section class="card"><div class="card-head"><h2>오늘 내 일정</h2><button type="button" class="link-btn" data-go="calendar">캘린더</button></div>
             ${mine.length ? `<ul class="plain-list">${mine.map((e) => `<li><span class="time">${e.start}:00</span> ${W.rich(e.title)}</li>`).join('')}</ul>` : '<p class="empty">오늘은 회의가 없다. 기적이다.</p>'}</section>
           <section class="card wide"><div class="card-head"><h2>공지사항</h2></div>
@@ -637,6 +649,8 @@
             ? `<div class="g-item"><span class="eyebrow">${esc(info.field)}</span><strong>${esc(t)}</strong><p>${esc(info.meaning)}</p><p class="example">예: "${esc(info.example)}"</p></div>`
             : `<div class="g-item locked"><span class="eyebrow">${esc(info.field)}</span><strong>???</strong><p>아직 만나지 못한 용어</p></div>`;
         }).join('')}</div></section>`;
+    } else if (v === 'manage') {
+      W.renderManage(main);
     } else if (v === 'hr') {
       W.renderHR(main);
     } else if (v === 'vacation') {
@@ -732,6 +746,7 @@
     });
 
     W.msg.bind();
+    W.bindManage($('#main'));
     $('#modal').addEventListener('click', (e) => {
       const b = e.target.closest('[data-modal]');
       if (b) W.modalClick(Number(b.dataset.modal));

@@ -115,7 +115,7 @@
       const opts = W.shuffle([term, ...wrong]);
       W.openModal(`<p class="eyebrow">${next.name} 승진 심사 · 질문 ${i + 1}/3</p>
         <h3>"${esc(term)}"이 무슨 뜻인지 설명해 보세요.</h3>
-        <p class="hint">면접관: 최영수 부장, 강태호 이사</p>${mood ? `<p class="${ally ? 'up' : 'down'}">${esc(mood)}</p>` : ''}`,
+        <p class="hint">면접관: ${s.rank >= 5 ? '강태호 이사, 대표이사' : '최영수 부장, 강태호 이사'}</p>${mood ? `<p class="${ally ? 'up' : 'down'}">${esc(mood)}</p>` : ''}`,
       opts.map((t) => ({ label: window.TERMS[t].meaning, onClick: () => {
         if (t === term) right++;
         ask(i + 1);
@@ -134,7 +134,7 @@
           <p>심사 ${right}/3 정답. 다음 주부터 ${esc(s.name)} ${esc(W.rankName())}님이다.</p>
           <p class="up">급여 ${W.fmtMoney(window.RANKS[s.rank].pay)} · 연차 +1일 · 멘탈 +15 · 평판 +5</p>
           <p class="hint">직급이 오를수록 출근 때 쌓인 업무와 요청이 늘어나요.</p>`,
-        [{ label: '출근하기', onClick: () => { W.closeModal(); W.beginDay(); } }]);
+        [{ label: '출근하기', onClick: () => { W.closeModal(); W.onPromoted(() => W.beginDay()); } }]);
       } else {
         s.points = Math.max(0, s.points - 1);
         W.openModal(`<p class="eyebrow">승진 심사 결과</p><h3>이번에는 보류</h3>

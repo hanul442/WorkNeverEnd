@@ -133,7 +133,7 @@ window.WNE = (() => {
   W.save = () => {
     try {
       const s = W.s;
-      const keep = ['name', 'job', 'level', 'day', 'stats', 'glossary', 'hangover', 'rank', 'points', 'leave', 'week', 'reviews', 'vacation', 'back', 'karma', 'rel', 'flags', 'story', 'storyDay', 'returns', 'talked', 'transfer', 'pastTeams', 'intel', 'leftAt'];
+      const keep = ['name', 'job', 'level', 'day', 'stats', 'glossary', 'hangover', 'rank', 'points', 'leave', 'week', 'reviews', 'vacation', 'back', 'karma', 'rel', 'flags', 'story', 'storyDay', 'returns', 'talked', 'transfer', 'pastTeams', 'intel', 'leftAt', 'crew'];
       localStorage.setItem(C.SAVE_KEY, JSON.stringify(Object.fromEntries(keep.map((k) => [k, s[k]]))));
     } catch (e) { /* 저장이 막힌 브라우저에서는 넘어간다 */ }
   };

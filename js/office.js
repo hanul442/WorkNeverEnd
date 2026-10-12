@@ -344,7 +344,7 @@
       return true;
     }
     if (ev.kind === 'summon') {
-      if (s.phase !== 'work') return true;
+      if (s.phase !== 'work' || W.isExec()) return true;
       // 두 번째 호출 기회는 꾸중할 일이 있을 때만
       if (s.summoned && (s.scolded || !todaysBad().length)) return true;
       s.summoned = true;
