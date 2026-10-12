@@ -123,8 +123,9 @@
   // scene: { place, lines, choices?, quiz?, perk? }, ctx: { who, members, ... }
   W.playScene = (scene, ctx = {}, done = () => {}) => {
     const s = W.s;
-    const wasPaused = s.paused;
     W.pause();
+    // 장면이 끝나면 근무 중일 때는 늘 시계를 다시 돌린다. 멈춘 채로 남으면 게임이 굳는다.
+    const keepRunning = () => !s.over && (s.phase === 'work' || s.phase === 'overtime');
     s.inScene = true;
     const log = [];
     const queue = scene.lines.slice();
@@ -148,8 +149,9 @@
       W.closeModal();
       s.inScene = false;
       W.renderAll();
+      // 먼저 시계를 되돌리고 done을 부른다. done 안에서 다음 장면이 열려도 그 장면이 시계를 다시 맡는다.
+      if (keepRunning()) W.resume();
       done();
-      if (!s.inScene && !wasPaused && !W.$('#modal').open && !s.over) W.resume();
     };
 
     const choose = () => {
@@ -173,7 +175,7 @@
       render(choices.map((c) => ({ label: c.label, onClick: () => {
         if (c.talk) { // 장면을 닫고 그 사람과 메신저로 대화
           W.closeModal(); s.inScene = false; done(); W.msg.open(ctx.who);
-          if (!wasPaused) W.resume();
+          if (keepRunning()) W.resume();
           return;
         }
         log.push(['me', c.label.replace(/^\(.*?\)\s*/, '') || c.label]);

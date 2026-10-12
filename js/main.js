@@ -58,6 +58,15 @@
     const morning = W.applyTransfer();
     s.calendar = W.gen.calendar();
 
+    // 밤사이 잠으로 체력이 돌아온다. 늦게 퇴근할수록 덜 잔다.
+    if (s.leftAt) {
+      const late = Math.max(0, Math.round((s.leftAt - C.DAY_END) / 60));
+      const sleep = W.clamp(30 - late * 5, 10, 30);
+      s.stats.stamina = W.clamp(s.stats.stamina + sleep, 0, 100);
+      s.stats.mental = W.clamp(s.stats.mental + 5, 0, 100);
+      morning.push(late >= 2 ? `늦게 퇴근해서 잠이 모자랐다. 체력 +${sleep}, 멘탈 +5` : `푹 자고 일어났다. 체력 +${sleep}, 멘탈 +5`);
+      s.leftAt = null;
+    }
     if (s.hangover) {
       s.stats.stamina = W.clamp(s.stats.stamina - 15, 0, 100);
       morning.push('어제 회식 여파로 머리가 깨질 것 같다. 체력 −15');
@@ -145,28 +154,30 @@
     setView('task');
   };
 
+  W.finishTask = (task, q, note) => finishTask(task, q, note);
   function finishTask(task, q, note) {
     const s = W.s;
     s.tasks = s.tasks.filter((t) => t !== task);
-    const effects = { stamina: -3 };
+    // 체력은 일한 시간만큼 닳는다 (10분에 1)
+    const effects = { stamina: -Math.max(1, Math.round(task.minutes / 10)) };
     let verdict;
     const L = W.level();
     if (q >= L.pass) {
       effects.perf = task.urgent ? 12 : 8;
-      effects.rep = 2;
+      effects.rep = task.urgent ? 2 : 1;
       effects.mental = 1;
       verdict = '통과';
       s.done++;
       W.karma(task.urgent ? 'urgent' : 'done', task.from, task.title);
     } else if (q >= L.ok) {
       effects.perf = 4;
-      effects.mental = -3;
+      effects.mental = -1;
       verdict = '수정 후 통과';
       s.done++;
     } else {
       effects.perf = -2;
       effects.rep = -3;
-      effects.mental = -4;
+      effects.mental = -3;
       verdict = '반려';
       s.missed++;
       W.karma('rejected', task.from, task.title);
@@ -229,6 +240,8 @@
     for (let i = 0; i < min; i++) {
       if (s.over) return;
       s.minute += 1;
+      // 일하는 것만으로도 멘탈이 조금씩 닳는다. 쉬는 시간이 그래서 필요하다.
+      if (s.phase === 'work' && s.minute % 60 === 0) s.stats.mental = W.clamp(s.stats.mental - 1, 0, 100);
       if (s.phase === 'overtime') {
         s.stats.stamina = W.clamp(s.stats.stamina - 0.15, 0, 100);
         s.stats.mental = W.clamp(s.stats.mental - 0.1, 0, 100);
@@ -354,6 +367,7 @@
       onClick: () => {
         const s = W.s;
         W.applyEffects(l.effects);
+        if (l.with !== 'skip') W.applyEffects({ stamina: 6 }); // 밥을 먹으면 기운이 난다
         W.closeModal();
         const shift = 13 * 60 - s.minute;
         s.tasks.forEach((t) => { t.due += shift + (l.work || 0); });
@@ -385,6 +399,7 @@
     const s = W.s;
     W.pause();
     s.phase = 'evening';
+    s.leftAt = s.minute;
     // 아직 안 나온 휴가 결재는 퇴근 전에 결과가 나온다
     s.queue.filter((q) => q.kind === 'leave').forEach((q) => W.resolveLeave(q.data));
     s.queue.filter((q) => q.kind === 'transfer').forEach((q) => W.resolveTransfer(q.data));
@@ -465,7 +480,7 @@
       const why = s.stats.stamina <= 0 ? '체력이 바닥나 쓰러졌다.' : '멘탈이 무너졌다.';
       W.openModal(`<p class="eyebrow">게임 오버</p><h3>번아웃 엔딩</h3><p>${why} ${s.day}일차에 회사를 떠난다.</p>
         <p class="hint">쉬는 것도 일이다. 커피타임, 점심, 퇴근 후 휴식을 챙겨 보세요.</p>`,
-      [{ label: '처음부터 다시', onClick: () => location.reload() }]);
+      [{ label: '처음부터 다시', onClick: () => location.reload() }], true);
     }
   };
 

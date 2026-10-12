@@ -133,7 +133,7 @@ window.WNE = (() => {
   W.save = () => {
     try {
       const s = W.s;
-      const keep = ['name', 'job', 'level', 'day', 'stats', 'glossary', 'hangover', 'rank', 'points', 'leave', 'week', 'reviews', 'vacation', 'back', 'karma', 'rel', 'flags', 'story', 'storyDay', 'returns', 'talked', 'transfer', 'pastTeams', 'intel'];
+      const keep = ['name', 'job', 'level', 'day', 'stats', 'glossary', 'hangover', 'rank', 'points', 'leave', 'week', 'reviews', 'vacation', 'back', 'karma', 'rel', 'flags', 'story', 'storyDay', 'returns', 'talked', 'transfer', 'pastTeams', 'intel', 'leftAt'];
       localStorage.setItem(C.SAVE_KEY, JSON.stringify(Object.fromEntries(keep.map((k) => [k, s[k]]))));
     } catch (e) { /* 저장이 막힌 브라우저에서는 넘어간다 */ }
   };
@@ -153,7 +153,11 @@ window.WNE = (() => {
 
   // ---------- 모달 ----------
   let modalButtons = [];
-  W.openModal = (html, buttons) => {
+  // final: 게임 오버 창. 한 번 뜨면 다른 창이 덮거나 닫지 못한다.
+  let locked = false;
+  W.openModal = (html, buttons, final = false) => {
+    if (locked) return;
+    if (final) locked = true;
     modalButtons = buttons;
     W.$('#modal-body').innerHTML = html + `<div class="modal-actions">${buttons.map((b, i) =>
       `<button class="${i === 0 ? 'btn primary' : 'btn'}" type="button" data-modal="${i}">${W.esc(b.label)}</button>`).join('')}</div>`;
@@ -161,6 +165,7 @@ window.WNE = (() => {
     if (!m.open) m.showModal();
   };
   W.closeModal = () => {
+    if (locked) return;
     const m = W.$('#modal');
     if (m.open) m.close();
   };

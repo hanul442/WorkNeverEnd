@@ -30,6 +30,7 @@
     if (task.opened) return;
     task.opened = true;
     if (!TWISTS[task.type] || task.twist) return;
+    if (W.hasPerk('twistShield')) return; // 결정 번복을 미리 들어서 대비해 뒀다
     if (Math.random() >= W.level().twist) return;
     W.s.queue.push({ at: W.s.minute + 4 + W.rand(8), kind: 'twist', data: { uid: task.uid } });
     W.s.queue.sort((a, b) => a.at - b.at);
